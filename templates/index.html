@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTracker</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a', // Slate 900
+                        cardbg: '#1e293b', // Slate 800
+                        brand: '#2563eb', // Blue 600
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- JQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f1f5f9; /* slate-100 */
+            --text-color: #0f172a; /* slate-900 */
+            --card-bg: #ffffff;
+            --input-bg: #e2e8f0; /* slate-200 */
+            --input-border: #cbd5e1; /* slate-300 */
+            --input-text: #0f172a; /* slate-900 */
+            --brand-color: #2563eb; /* blue-600 */
+            --brand-hover: #1d4ed8; /* blue-700 */
+            --border-color: #e2e8f0; /* slate-200 */
+        }
+
+        .dark {
+            --bg-color: #0f172a; /* slate-900 */
+            --text-color: #f8fafc; /* slate-50 */
+            --card-bg: #1e293b; /* slate-800 */
+            --input-bg: #334155; /* slate-700 */
+            --input-border: #475569; /* slate-600 */
+            --input-text: #f8fafc; /* slate-50 */
+            --border-color: #334155; /* slate-700 */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: sans-serif;
+        }
+        .input-dark {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--input-text);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            width: 100%;
+        }
+        .btn-brand {
+            background-color: var(--brand-color);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+        }
+        .btn-brand:hover {
+            background-color: var(--brand-hover);
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+        .divide-slate-700 {
+            border-color: var(--border-color);
+        }
+        .bg-slate-800 {
+            background-color: var(--card-bg);
+        }
+        .text-slate-300 {
+            color: var(--text-color);
+        }
+        .hover\:bg-slate-800\/50:hover {
+            background-color: rgba(30, 41, 59, 0.5);
+        }
+        .dark .hover\:bg-slate-800\/50:hover {
+            background-color: rgba(30, 41, 59, 0.5);
+        }
+        .light .hover\:bg-slate-800\/50:hover {
+            background-color: rgba(241, 245, 249, 0.5);
+        }
+        .text-slate-400 {
+            color: #94a3b8;
+        }
+        .dark .text-slate-400 {
+            color: #94a3b8;
+        }
+        .light .text-slate-400 {
+            color: #64748b;
+        }
+
+    </style>
+</head>
+<body class="p-4 md:p-6 pb-20">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div class="flex items-center gap-2">
+            <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
+            <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
+        </div>
+
+        <div class="flex flex-wrap gap-2 items-center">
+            <select id="monthSelect" class="input-dark w-40">
+                <option value="">Loading...</option>
+            </select>
+            <button onclick="showCreateModal()" class="btn-brand flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i> New Month</button>
+            <button onclick="showAccountsModal()" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded" title="Manage Accounts"><i data-lucide="credit-card" class="w-5 h-5"></i></button>
+            <button onclick="triggerImport()" class="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded"><i data-lucide="upload" class="w-5 h-5"></i></button>
+            <button onclick="exportPDF()" class="bg-slate-600 hover:bg-slate-700 text-white p-2 rounded"><i data-lucide="download" class="w-5 h-5"></i></button>
+            <button id="theme-toggle" class="bg-slate-600 hover:bg-slate-700 text-white p-2 rounded">
+                <i id="theme-icon" data-lucide="sun" class="w-5 h-5"></i>
+            </button>
+            <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded flex items-center gap-1" title="Logout">
+                <i data-lucide="log-out" class="w-5 h-5"></i>
+            </a>
+            <input type="file" id="csvInput" class="hidden" accept=".csv" onchange="handleImport(this)">
+        </div>
+    </div>
+
+    <!-- Welcome Message -->
+    <div class="mb-4 text-slate-400">
+        Welcome, <span class="font-bold text-blue-400">{{ name }}</span>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="statsContainer">
+        <!-- Injected via JS -->
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- LEFT: Main Paid Expenses -->
+        <div class="lg:col-span-2 space-y-4">
+            <div class="card">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold flex items-center gap-2">
+                        <i data-lucide="check-circle" class="text-emerald-500 w-5 h-5"></i> Paid Expenses
+                    </h2>
+                    <span class="text-sm text-slate-400" id="totalPaidDisplay">₹0</span>
+                </div>
+
+                <!-- Add New Paid -->
+                <div class="grid grid-cols-12 gap-2 mb-4">
+                    <input type="text" id="newPaidReason" placeholder="Reason" class="input-dark col-span-2">
+                    <div class="col-span-2 flex gap-1">
+                        <select id="newPaidCat" class="input-dark w-full">
+                            <option value="">Cat...</option>
+                        </select>
+                        <button onclick="addNewCategory()" class="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded" title="Add Category">+</button>
+                    </div>
+                    <select id="newPaidAccount" class="input-dark col-span-2">
+                        <option value="">Account...</option>
+                    </select>
+                    <input type="date" id="newPaidDate" class="input-dark col-span-2">
+                    <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-2">
+                    <button onclick="addPaid()" class="btn-brand col-span-2 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-800 text-slate-300">
+                            <tr>
+                                <th class="p-2 rounded-l">Reason</th>
+                                <th class="p-2">Category</th>
+                                <th class="p-2">Date</th>
+                                <th class="p-2 text-right">Amount</th>
+                                <th class="p-2 rounded-r w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="paidList" class="divide-y divide-slate-700">
+                            <!-- Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Personal & Pending -->
+        <div class="space-y-6">
+
+             <!-- Income & Opening Settings -->
+             <div class="card">
+                <h3 class="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Income</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs text-slate-500">Opening Balances</label>
+                        <div id="openingBalancesContainer" class="space-y-1 mt-1">
+                            <!-- Opening balances per account will be injected here -->
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500">Income Sources</label>
+                        <div id="incomeList" class="space-y-2"></div>
+                        <div class="flex gap-2 mt-2">
+                            <input type="text" id="newIncomeSource" placeholder="Source" class="input-dark flex-grow">
+                            <select id="newIncomeAccount" class="input-dark w-32">
+                                <option value="">Account...</option>
+                            </select>
+                            <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark w-24">
+                            <button onclick="addIncome()" class="btn-brand"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Daily Log -->
+            <div class="card border-l-4 border-l-blue-500">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Personal Daily Log</h2>
+                    <span class="text-blue-400 font-bold" id="totalPersonalDisplay">₹0</span>
+                </div>
+                <div class="text-xs text-slate-400 mb-2">Sum deducted from Current Balance as one total.</div>
+
+                <div class="flex gap-2 mb-3">
+                    <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark flex-grow">
+                    <select id="newPersAccount" class="input-dark w-32">
+                        <option value="">Account...</option>
+                    </select>
+                    <input type="date" id="newPersDate" class="input-dark w-32">
+                    <input type="number" id="newPersAmount" placeholder="₹" class="input-dark w-24">
+                    <button onclick="addPersonal()" class="btn-brand"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                </div>
+
+                <div class="max-h-48 overflow-y-auto space-y-2 pr-1" id="personalList">
+                    <!-- Items -->
+                </div>
+            </div>
+
+            <!-- Pending / Budget -->
+            <div class="card border-l-4 border-l-orange-500">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Pending / Budget</h2>
+                    <span class="text-orange-400 font-bold" id="totalPendingDisplay">₹0</span>
+                </div>
+
+                <div class="grid grid-cols-12 gap-2 mb-3">
+                    <input type="text" id="newPendReason" placeholder="Reason" class="input-dark col-span-5">
+                    <div class="col-span-3 flex gap-1">
+                        <select id="newPendCat" class="input-dark w-full">
+                            <option value="">Loading...</option>
+                        </select>
+                        <button onclick="addNewCategory()" class="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded" title="Add Category">+</button>
+                    </div>
+                    <!-- <input type="date" id="newPendDate" class="input-dark col-span-2"> -->
+                    <input type="number" id="newPendAmount" placeholder="₹" class="input-dark col-span-2">
+                    <button onclick="addPending()" class="btn-brand col-span-2 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                </div>
+
+                <div class="space-y-2" id="pendingList">
+                    <!-- Pending Items -->
+                </div>
+            </div>
+
+            <!-- Long Pending Payments -->
+            <div class="card border-l-4 border-l-purple-500">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Long Pending</h2>
+                    <span class="text-purple-400 font-bold" id="totalLongPendingDisplay">₹0</span>
+                </div>
+
+                <div class="flex gap-2 mb-3">
+                    <input type="text" id="newLPReason" placeholder="Item (e.g. Loan)" class="input-dark flex-grow">
+                    <input type="number" id="newLPAmount" placeholder="Total ₹" class="input-dark w-24">
+                    <button onclick="addLongPending()" class="btn-brand bg-purple-600 hover:bg-purple-700"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                </div>
+
+                <div class="space-y-3" id="longPendingList">
+                    <!-- Items -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- PDF Report Template (Hidden) -->
+    <div id="pdfReport" class="hidden bg-white text-black p-8 max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-8 border-b border-gray-300 pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-600">MTracker</h1>
+                <div class="text-sm text-gray-500">Statement of Accounts</div>
+            </div>
+            <div class="text-right">
+                <div class="text-xl font-bold" id="pdfMonthId"></div>
+                <div class="text-sm text-gray-500" id="pdfGeneratedDate"></div>
+                <div class="text-sm font-semibold mt-1" id="pdfUserName">{{ name }}</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-8 mb-8">
+            <div>
+                <h3 class="font-bold text-gray-700 mb-2">Summary</h3>
+                <table class="w-full text-sm">
+                    <tr><td class="py-1 text-gray-600">Opening Balance</td><td class="text-right font-mono" id="pdfOpening"></td></tr>
+                    <tr><td class="py-1 text-gray-600">Total Income</td><td class="text-right font-mono text-green-600" id="pdfIncome"></td></tr>
+                    <tr><td class="py-1 text-gray-600">Total Expenses</td><td class="text-right font-mono text-red-600" id="pdfExpenses"></td></tr>
+                    <tr class="border-t border-gray-300 font-bold"><td class="py-2">Closing Balance</td><td class="text-right font-mono" id="pdfClosing"></td></tr>
+                </table>
+            </div>
+            <div class="bg-gray-50 p-4 rounded border border-gray-200">
+                 <h3 class="font-bold text-gray-700 mb-2">Net Position</h3>
+                 <div class="text-3xl font-bold text-blue-600" id="pdfNetPosition"></div>
+                 <div class="text-xs text-gray-500 mt-1">Real money in hand</div>
+            </div>
+        </div>
+
+        <h3 class="font-bold text-lg mb-4 border-b border-gray-300 pb-2">Transaction History</h3>
+        <table class="w-full text-sm text-left">
+            <thead>
+                <tr class="bg-gray-100 text-gray-600 uppercase text-xs">
+                    <th class="p-2">Date</th>
+                    <th class="p-2">Description</th>
+                    <th class="p-2">Category</th>
+                    <th class="p-2 text-right">Credit</th>
+                    <th class="p-2 text-right">Debit</th>
+                </tr>
+            </thead>
+            <tbody id="pdfTransactionList" class="divide-y divide-gray-200">
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modals -->
+    <!-- Accounts Modal -->
+    <div id="accountsModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="card w-96 max-w-full m-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Manage Accounts</h3>
+                <button onclick="closeAccountsModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div id="accountsList" class="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                <!-- Accounts will be loaded here -->
+            </div>
+            <form id="addAccountForm" onsubmit="handleAddAccount(event)" class="flex gap-2">
+                <input type="text" name="accountName" placeholder="New Account Name" class="input-dark flex-1" required>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500">Add</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="createModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="card w-96 max-w-full m-4">
+            <h2 class="text-xl font-bold mb-4">Start New Month</h2>
+            <div class="space-y-4">
+                <input type="text" id="newMonthId" placeholder="JAN-26" class="input-dark uppercase">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="copyPending" class="w-4 h-4">
+                    <label for="copyPending">Copy Pending items from current?</label>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="$('#createModal').addClass('hidden')" class="w-full py-2 bg-slate-700 rounded hover:bg-slate-600">Cancel</button>
+                    <button onclick="createMonth()" class="w-full py-2 bg-blue-600 rounded hover:bg-blue-500">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        let currentData = {};
+        let currentMonthId = '';
+        let accounts = [];
+
+        $(document).ready(function() {
+            lucide.createIcons();
+            loadMonths();
+            loadCategories(); // Load categories
+            loadAccounts(); // Load accounts
+            initTheme();
+
+            $('#monthSelect').change(function() {
+                loadMonthData($(this).val());
+            });
+
+            $('#theme-toggle').click(toggleTheme);
+
+            loadLongPending();
+        });
+
+        // --- Theme ---
+        function initTheme() {
+            const isDarkMode = localStorage.getItem('theme') === 'dark';
+            if (isDarkMode) {
+                $('html').addClass('dark').removeClass('light');
+                $('#theme-icon').attr('data-lucide', 'moon');
+            } else {
+                $('html').addClass('light').removeClass('dark');
+                $('#theme-icon').attr('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+        }
+
+        function toggleTheme() {
+            const html = $('html');
+            const isDarkMode = html.hasClass('dark');
+            if (isDarkMode) {
+                html.removeClass('dark').addClass('light');
+                localStorage.setItem('theme', 'light');
+                $('#theme-icon').attr('data-lucide', 'sun');
+            } else {
+                html.removeClass('light').addClass('dark');
+                localStorage.setItem('theme', 'dark');
+                $('#theme-icon').attr('data-lucide', 'moon');
+            }
+            lucide.createIcons();
+        }
+
+
+        // --- API Calls ---
+
+        function loadCategories() {
+            $.get('/api/categories', function(cats) {
+                const options = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+                $('#newPaidCat').html(options);
+                $('#newPendCat').html(options);
+            }).fail(function(xhr) {
+                if (xhr.status === 401) window.location.href = '/login';
+            });
+        }
+
+        function addNewCategory() {
+            const newCat = prompt("Enter new category name:");
+            if (!newCat) return;
+
+            $.ajax({
+                url: '/api/categories',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ category: newCat }),
+                success: function(res) {
+                    loadCategories();
+                },
+                error: function(err) {
+                    alert(err.responseJSON.message || "Error adding category");
+                }
+            });
+        }
+
+        function loadAccounts() {
+            $.get('/api/accounts', function(accs) {
+                accounts = accs;
+                updateAccountDropdowns();
+                renderAccountsList();
+            }).fail(function(xhr) {
+                if (xhr.status === 401) window.location.href = '/login';
+            });
+        }
+
+        function updateAccountDropdowns() {
+            const options = '<option value="">Account...</option>' + accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+            $('#newPaidAccount').html(options);
+            $('#newIncomeAccount').html(options);
+            $('#newPersAccount').html(options);
+        }
+
+        function renderAccountsList() {
+            const list = $('#accountsList');
+            list.empty();
+            accounts.forEach(acc => {
+                list.append(`
+                    <div class="flex justify-between items-center p-2 bg-slate-100 dark:bg-slate-700 rounded">
+                        <span>${acc}</span>
+                        <!-- Delete button could go here if implemented -->
+                    </div>
+                `);
+            });
+        }
+
+        function showAccountsModal() {
+            $('#accountsModal').removeClass('hidden').addClass('flex');
+            renderAccountsList();
+        }
+
+        function closeAccountsModal() {
+            $('#accountsModal').addClass('hidden').removeClass('flex');
+        }
+
+        function handleAddAccount(e) {
+            e.preventDefault();
+            const name = e.target.accountName.value;
+            if (!name) return;
+
+            $.ajax({
+                url: '/api/accounts',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ name: name }),
+                success: function(res) {
+                    e.target.reset();
+                    loadAccounts();
+                    if (currentMonthId) loadMonthData(currentMonthId);
+                },
+                error: function(err) {
+                    alert(err.responseJSON.message || "Error adding account");
+                }
+            });
+        }
+
+        function loadMonths() {
+            $.get('/api/months', function(months) {
+                const sel = $('#monthSelect');
+                sel.empty();
+                if (months.length === 0) {
+                    sel.append('<option value="">No Data</option>');
+                    // Prompt to create or import
+                    showCreateModal();
+                } else {
+                    months.forEach(m => sel.append(`<option value="${m}">${m}</option>`));
+                    loadMonthData(months[0]); // Load first
+                }
+            }).fail(function(xhr) {
+                if (xhr.status === 401) window.location.href = '/login';
+            });
+        }
+
+        function loadMonthData(id) {
+            currentMonthId = id;
+            $.get(`/api/month/${id}`, function(data) {
+                currentData = data;
+                renderUI();
+            }).fail(function(xhr) {
+                if (xhr.status === 401) window.location.href = '/login';
+            });
+        }
+
+        function saveData() {
+            $.ajax({
+                url: '/api/save',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ id: currentMonthId, data: currentData }),
+                success: function() { console.log("Saved"); renderUI(); }
+            });
+        }
+
+        function createMonth() {
+            const newId = $('#newMonthId').val();
+            const copy = $('#copyPending').is(':checked');
+
+            $.ajax({
+                url: '/api/create_month',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    new_month_id: newId,
+                    prev_month_id: currentMonthId,
+                    copy_pending: copy
+                }),
+                success: function(res) {
+                    $('#createModal').addClass('hidden');
+                    loadMonths(); // Reloads list and should select new one theoretically
+                    // Force select
+                    setTimeout(() => {
+                        $('#monthSelect').val(newId).change();
+                    }, 500);
+                },
+                error: function(err) {
+                    alert(err.responseJSON.message || "Error creating month");
+                }
+            });
+        }
+
+        // --- UI Rendering ---
+
+        function renderUI() {
+            if (!currentData) return;
+
+            // --- Backward compatibility for income ---
+            if (typeof currentData.income === 'number' || !currentData.income) {
+                if (currentData.income > 0) {
+                    currentData.income = [{ id: Date.now(), source: 'Salary', amount: currentData.income }];
+                } else {
+                    currentData.income = [];
+                }
+            }
+
+            // --- Handle Opening Balance (Dict or Float) ---
+            let openingBalances = {};
+            let totalOpening = 0;
+            if (typeof currentData.openingBalance === 'object' && currentData.openingBalance !== null) {
+                openingBalances = currentData.openingBalance;
+                for (let acc in openingBalances) {
+                    totalOpening += parseFloat(openingBalances[acc] || 0);
+                }
+            } else {
+                // Legacy: Assign to 'Cash' or default
+                totalOpening = parseFloat(currentData.openingBalance || 0);
+                openingBalances['Cash'] = totalOpening;
+            }
+
+            const totalIncome = (currentData.income || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+
+            // Calculate Totals
+            const totalPersonal = (currentData.personalExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const totalPaidList = (currentData.paidExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const totalPaid = totalPaidList + totalPersonal;
+            const totalPending = (currentData.pendingExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+
+            const totalAvailable = totalOpening + totalIncome;
+            const currentBalance = totalAvailable - totalPaid;
+            const expectedBalance = currentBalance - totalPending;
+
+            // --- Calculate Per-Account Balances ---
+            let accountBalances = { ...openingBalances };
+            // Ensure all accounts exist in balances with 0 if not present
+            accounts.forEach(acc => { if (accountBalances[acc] === undefined) accountBalances[acc] = 0; });
+
+            // Add Income
+            (currentData.income || []).forEach(item => {
+                const acc = item.account || 'Cash';
+                accountBalances[acc] = (accountBalances[acc] || 0) + parseFloat(item.amount);
+            });
+
+            // Subtract Paid Expenses
+            (currentData.paidExpenses || []).forEach(item => {
+                const acc = item.account || 'Cash';
+                accountBalances[acc] = (accountBalances[acc] || 0) - parseFloat(item.amount);
+            });
+
+            // Subtract Personal Expenses
+            (currentData.personalExpenses || []).forEach(item => {
+                const acc = item.account || 'Cash';
+                accountBalances[acc] = (accountBalances[acc] || 0) - parseFloat(item.amount);
+            });
+
+            // Update Opening Balances UI
+            const openingContainer = $('#openingBalancesContainer');
+            openingContainer.empty();
+            const allAccounts = new Set([...accounts, ...Object.keys(openingBalances)]);
+
+            allAccounts.forEach(acc => {
+                const val = openingBalances[acc] || 0;
+                openingContainer.append(`
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">${acc}</span>
+                        <input type="number" class="input-dark w-24 text-right p-1 h-6"
+                            value="${val}"
+                            onchange="updateOpeningBalance('${acc}', this.value)">
+                    </div>
+                `);
+            });
+
+            // Render Income List
+            const incomeHtml = (currentData.income || []).map(item => `
+                <div class="flex justify-between items-center text-sm p-2 bg-slate-800/50 rounded group">
+                    <div>
+                        <span>${item.source}</span>
+                        <span class="text-xs text-slate-500 ml-2 bg-slate-700 px-1 rounded">${item.account || 'Cash'}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-green-400">₹${item.amount.toLocaleString()}</span>
+                        <button onclick="deleteItem('income', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                    </div>
+                </div>
+            `).join('');
+            $('#incomeList').html(incomeHtml);
+
+
+            // Render Stats Cards
+            let balanceBreakdown = '';
+            for (let acc in accountBalances) {
+                balanceBreakdown += `<div class="flex justify-between text-xs text-slate-300"><span>${acc}:</span> <span>₹${accountBalances[acc].toLocaleString()}</span></div>`;
+            }
+
+            $('#statsContainer').html(`
+                <div class="card border-l-4 border-l-slate-400">
+                    <div class="text-slate-400 text-xs uppercase font-bold">Initial Balance</div>
+                    <div class="text-2xl font-bold">₹${totalAvailable.toLocaleString()}</div>
+                    <div class="text-xs text-slate-500">Opening + Income</div>
+                </div>
+                <div class="card border-l-4 border-l-blue-500">
+                    <div class="text-blue-400 text-xs uppercase font-bold">Current Balance</div>
+                    <div class="text-2xl font-bold text-white">₹${currentBalance.toLocaleString()}</div>
+                    <div class="space-y-1 mt-1 border-t border-slate-700 pt-1">
+                        ${balanceBreakdown}
+                    </div>
+                </div>
+                <div class="card border-l-4 border-l-emerald-500">
+                    <div class="text-emerald-400 text-xs uppercase font-bold">Expected Balance</div>
+                    <div class="text-2xl font-bold">₹${expectedBalance.toLocaleString()}</div>
+                    <div class="text-xs text-slate-500">After pending bills</div>
+                </div>
+            `);
+
+            $('#totalPersonalDisplay').text('₹' + totalPersonal.toLocaleString());
+            $('#totalPaidDisplay').text('₹' + totalPaidList.toLocaleString());
+            $('#totalPendingDisplay').text('₹' + totalPending.toLocaleString());
+
+            // Render Paid List
+            let paidHtml = '';
+
+            // Personal Expenses Summary Row
+            if (totalPersonal > 0) {
+                paidHtml += `
+                <tr class="bg-blue-900/20 border-b border-blue-900/30">
+                    <td class="p-2 font-medium text-blue-400">Personal Expenses (Total)</td>
+                    <td class="p-2"><span class="bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded text-xs">Personal</span></td>
+                    <td class="p-2 text-slate-400 text-xs">-</td>
+                    <td class="p-2 text-right font-mono text-blue-300">₹${totalPersonal.toLocaleString()}</td>
+                    <td class="p-2 text-right"></td>
+                </tr>`;
+            }
+
+            paidHtml += (currentData.paidExpenses || []).slice().reverse().map(item => `
+                <tr class="border-b border-slate-700 hover:bg-slate-700/50 group">
+                    <td class="p-2">
+                        ${item.reason}
+                        <div class="text-xs text-slate-500">${item.account || 'Cash'}</div>
+                    </td>
+                    <td class="p-2"><span class="bg-slate-700 px-2 py-1 rounded text-xs">${item.category}</span></td>
+                    <td class="p-2 text-slate-400 text-xs">${item.date}</td>
+                    <td class="p-2 text-right font-mono text-emerald-400">₹${item.amount.toLocaleString()}</td>
+                    <td class="p-2 text-right">
+                        <button onclick="deleteItem('paidExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>`).join('');
+            $('#paidList').html(paidHtml);
+
+            // Render Personal List
+            const persHtml = (currentData.personalExpenses || []).slice().reverse().map(item => `
+                <div class="flex justify-between items-center text-sm p-2 bg-slate-800/50 rounded group">
+                    <div>
+                        <span>${item.reason}</span>
+                        <div class="text-xs text-slate-400">${item.date || ''}</div>
+                        <div class="text-xs text-slate-500">${item.account || 'Cash'}</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-blue-300">₹${item.amount}</span>
+                        <button onclick="deleteItem('personalExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                    </div>
+                </div>
+            `).join('');
+            $('#personalList').html(persHtml);
+
+            // Render Pending List
+            const pendHtml = (currentData.pendingExpenses || []).map(item => `
+                <div class="flex justify-between items-center p-3 bg-slate-800 border border-slate-700 rounded shadow-sm group">
+                    <div>
+                        <div class="font-medium">${item.reason}</div>
+                        <div class="text-xs text-slate-400">${item.date || ''}</div>
+                        <div class="text-xs text-orange-400">${item.category}</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <div class="font-bold">₹${item.amount}</div>
+                            <div class="text-xs text-slate-500">${item.mode || 'Online'}</div>
+                        </div>
+                        <button onclick="payItem('${item.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded" title="Mark Paid">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="deleteItem('pendingExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100 p-1">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            $('#pendingList').html(pendHtml);
+
+            lucide.createIcons();
+        }
+
+        // --- Actions ---
+
+        function addIncome() {
+            const source = $('#newIncomeSource').val();
+            const amount = parseFloat($('#newIncomeAmount').val());
+            const account = $('#newIncomeAccount').val() || 'Cash';
+
+            if(!source || !amount) return;
+
+            if (!Array.isArray(currentData.income)) currentData.income = [];
+
+            currentData.income.push({
+                id: Date.now(),
+                source,
+                amount,
+                account
+            });
+
+            $('#newIncomeSource').val('');
+            $('#newIncomeAmount').val('');
+            saveData();
+        }
+
+        function addPaid() {
+            const reason = $('#newPaidReason').val();
+            const amount = parseFloat($('#newPaidAmount').val());
+            const cat = $('#newPaidCat').val();
+            const date = $('#newPaidDate').val() || new Date().toISOString().split('T')[0];
+            const account = $('#newPaidAccount').val() || 'Cash';
+
+            if(!reason || !amount) return;
+
+            if (!currentData.paidExpenses) currentData.paidExpenses = [];
+            currentData.paidExpenses.push({
+                id: Date.now(),
+                reason,
+                category: cat,
+                amount,
+                date: date,
+                account
+            });
+
+            $('#newPaidReason').val('');
+            $('#newPaidAmount').val('');
+            saveData();
+        }
+
+        function addPersonal() {
+            const reason = $('#newPersReason').val();
+            const amount = parseFloat($('#newPersAmount').val());
+            const date = $('#newPersDate').val() || new Date().toISOString().split('T')[0];
+            const account = $('#newPersAccount').val() || 'Cash';
+
+            if(!reason || !amount) return;
+
+            if (!currentData.personalExpenses) currentData.personalExpenses = [];
+            currentData.personalExpenses.push({
+                id: Date.now(),
+                reason,
+                amount,
+                date: date,
+                account
+            });
+
+            $('#newPersReason').val('');
+            $('#newPersAmount').val('');
+            $('#newPersDate').val('');
+            saveData();
+        }
+
+        function addPending() {
+            const reason = $('#newPendReason').val();
+            const amount = parseFloat($('#newPendAmount').val());
+            const cat = $('#newPendCat').val();
+
+            if(!reason || !amount) return;
+
+            if (!currentData.pendingExpenses) currentData.pendingExpenses = [];
+            currentData.pendingExpenses.push({
+                id: Date.now(),
+                reason,
+                category: cat,
+                amount,
+                date: '', // No date for pending
+                mode: "Online"
+            });
+
+            $('#newPendReason').val('');
+            $('#newPendAmount').val('');
+            saveData();
+        }
+
+        function deleteItem(listName, id) {
+            if(!confirm('Are you sure?')) return;
+
+            if (listName === 'paidExpenses') {
+                // Use specific API for paid expenses to handle long pending reversals
+                $.ajax({
+                    url: `/api/month/${currentMonthId}/expense/${id}`,
+                    type: 'DELETE',
+                    success: function() {
+                        loadMonthData(currentMonthId);
+                        loadLongPending(); // Refresh long pending list too
+                    },
+                    error: function(err) {
+                        alert(err.responseJSON.message || "Error deleting expense");
+                    }
+                });
+            } else {
+                // Default client-side delete for others
+                currentData[listName] = currentData[listName].filter(i => String(i.id) !== String(id));
+                saveData();
+            }
+        }
+
+        function payItem(id) {
+            const item = currentData.pendingExpenses.find(i => String(i.id) === String(id));
+            if (!item) return;
+
+            // Remove from Pending
+            currentData.pendingExpenses = currentData.pendingExpenses.filter(i => String(i.id) !== String(id));
+
+            // Add to Paid
+            if (!currentData.paidExpenses) currentData.paidExpenses = [];
+            currentData.paidExpenses.push({
+                id: Date.now(),
+                reason: item.reason,
+                category: item.category,
+                amount: item.amount,
+                date: new Date().toISOString().split('T')[0],
+                account: 'Cash'
+            });
+
+            saveData();
+        }
+        function updateOpeningBalance(account, value) {
+            if (typeof currentData.openingBalance !== 'object' || currentData.openingBalance === null) {
+                // If it was a number (legacy), convert to object preserving the value for 'Cash' if possible, or just reset
+                const oldVal = typeof currentData.openingBalance === 'number' ? currentData.openingBalance : 0;
+                currentData.openingBalance = { 'Cash': oldVal };
+            }
+            currentData.openingBalance[account] = parseFloat(value) || 0;
+            saveData();
+        }
+
+        // --- Import/Export ---
+
+        function triggerImport() {
+            $('#csvInput').click();
+        }
+
+        function handleImport(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('month_id', currentMonthId);
+
+            $.ajax({
+                url: '/api/import',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    alert('Import Successful!');
+                    currentData = data.data;
+                    renderUI();
+                },
+                error: function() { alert('Import failed'); }
+            });
+        }
+
+        function exportPDF() {
+            if (!currentData) return;
+
+            // 1. Prepare Data
+            // Handle Opening Balance (Dict or Float)
+            let totalOpening = 0;
+            if (typeof currentData.openingBalance === 'object' && currentData.openingBalance !== null) {
+                for (let acc in currentData.openingBalance) {
+                    totalOpening += parseFloat(currentData.openingBalance[acc] || 0);
+                }
+            } else {
+                totalOpening = parseFloat(currentData.openingBalance || 0);
+            }
+
+            const income = (currentData.income || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const totalPersonal = (currentData.personalExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const totalPaidList = (currentData.paidExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            const totalExpenses = totalPaidList + totalPersonal;
+            const closing = totalOpening + income - totalExpenses;
+
+            // 2. Populate Header & Summary
+            $('#pdfMonthId').text(currentMonthId);
+            $('#pdfGeneratedDate').text(new Date().toLocaleDateString());
+            $('#pdfOpening').text('₹' + totalOpening.toLocaleString());
+            $('#pdfIncome').text('₹' + income.toLocaleString());
+            $('#pdfExpenses').text('₹' + totalExpenses.toLocaleString());
+            $('#pdfClosing').text('₹' + closing.toLocaleString());
+            $('#pdfNetPosition').text('₹' + closing.toLocaleString());
+
+            // 3. Build Transaction List
+            let transactions = [];
+
+            // Add Income
+            (currentData.income || []).forEach(item => {
+                transactions.push({
+                    date: '01', // Default to start of month if no date
+                    fullDate: 'N/A',
+                    desc: item.source,
+                    cat: 'Income',
+                    credit: item.amount,
+                    debit: 0,
+                    type: 'income'
+                });
+            });
+
+            // Add Paid Expenses
+            (currentData.paidExpenses || []).forEach(item => {
+                transactions.push({
+                    date: item.date ? item.date.split('-')[2] : '31',
+                    fullDate: item.date || 'N/A',
+                    desc: item.reason,
+                    cat: item.category,
+                    credit: 0,
+                    debit: item.amount,
+                    type: 'expense'
+                });
+            });
+
+            // Add Personal Expenses
+            (currentData.personalExpenses || []).forEach(item => {
+                transactions.push({
+                    date: item.date ? item.date.split('-')[2] : '31',
+                    fullDate: item.date || 'N/A',
+                    desc: item.reason,
+                    cat: 'Personal',
+                    credit: 0,
+                    debit: item.amount,
+                    type: 'personal'
+                });
+            });
+
+            // Sort by Date
+            transactions.sort((a, b) => {
+                if (a.fullDate === 'N/A') return -1;
+                if (b.fullDate === 'N/A') return 1;
+                return a.fullDate.localeCompare(b.fullDate);
+            });
+
+            // Render Rows
+            const rows = transactions.map(t => `
+                <tr>
+                    <td class="p-2 text-gray-500">${t.fullDate}</td>
+                    <td class="p-2 font-medium">${t.desc}</td>
+                    <td class="p-2 text-xs text-gray-500 uppercase">${t.cat}</td>
+                    <td class="p-2 text-right font-mono text-green-600">${t.credit > 0 ? '₹' + t.credit.toLocaleString() : ''}</td>
+                    <td class="p-2 text-right font-mono text-red-600">${t.debit > 0 ? '₹' + t.debit.toLocaleString() : ''}</td>
+                </tr>
+            `).join('');
+
+            $('#pdfTransactionList').html(rows);
+
+            // 4. Generate PDF
+            const element = document.getElementById('pdfReport');
+            element.classList.remove('hidden'); // Show temporarily
+
+            const opt = {
+                margin: 0.5,
+                filename: `Statement_${currentMonthId}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                element.classList.add('hidden'); // Hide again
+            });
+        }
+
+        function loadLongPending() {
+            $.get('/api/long_pending', function(data) {
+                const list = $('#longPendingList');
+                list.empty();
+                let totalRemaining = 0;
+
+                data.forEach(item => {
+                    if (item.status === 'completed') return; // Skip completed for now or show differently
+
+                    totalRemaining += item.remainingAmount;
+                    const percent = Math.min(100, (item.paidAmount / item.totalAmount) * 100);
+
+                    list.append(`
+                        <div class="p-3 bg-slate-800 border border-slate-700 rounded shadow-sm group">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <div class="font-medium">${item.reason}</div>
+                                    <div class="text-xs text-slate-400">Total: ₹${item.totalAmount.toLocaleString()}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold text-purple-400">₹${item.remainingAmount.toLocaleString()}</div>
+                                    <div class="text-xs text-slate-500">Remaining</div>
+                                </div>
+                            </div>
+
+                            <!-- Progress Bar -->
+                            <div class="w-full bg-slate-700 rounded-full h-1.5 mb-3">
+                                <div class="bg-purple-500 h-1.5 rounded-full" style="width: ${percent}%"></div>
+                            </div>
+
+                            <div class="flex justify-end gap-2">
+                                <button onclick="payLongPending(${item.id}, '${item.reason}', ${item.remainingAmount})" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded flex items-center gap-1">
+                                    <i data-lucide="banknote" class="w-3 h-3"></i> Pay
+                                </button>
+                                <button onclick="deleteLongPending('${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100 p-1">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `);
+                });
+
+                $('#totalLongPendingDisplay').text('₹' + totalRemaining.toLocaleString());
+                lucide.createIcons();
+            }).fail(function(xhr) {
+                if (xhr.status === 401) window.location.href = '/login';
+            });
+        }
+
+        function addLongPending() {
+            const reason = $('#newLPReason').val();
+            const amount = parseFloat($('#newLPAmount').val());
+
+            if (!reason || !amount) return;
+
+            $.ajax({
+                url: '/api/long_pending',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    id: Date.now(),
+                    reason: reason,
+                    totalAmount: amount,
+                    category: 'General'
+                }),
+                success: function() {
+                    $('#newLPReason').val('');
+                    $('#newLPAmount').val('');
+                    loadLongPending();
+                }
+            });
+        }
+
+        function deleteLongPending(id) {
+            if (!confirm('Delete this long pending item?')) return;
+            $.ajax({
+                url: `/api/long_pending/${id}`,
+                type: 'DELETE',
+                success: function() { loadLongPending(); }
+            });
+        }
+
+        function payLongPending(id, name, maxAmount) {
+            if (!currentMonthId) {
+                alert("Please select a month first.");
+                return;
+            }
+
+            const amountStr = prompt(`Enter payment amount for "${name}" (Max: ₹${maxAmount}) in ${currentMonthId}:`);
+            if (!amountStr) return;
+
+            const amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) {
+                alert("Invalid amount");
+                return;
+            }
+            if (amount > maxAmount) {
+                alert("Amount exceeds remaining balance.");
+                return;
+            }
+
+            $.ajax({
+                url: `/api/long_pending/${id}/partial_payment`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    amount: amount,
+                    month_id: currentMonthId,
+                    mode: 'Online'
+                }),
+                success: function() {
+                    loadLongPending();
+                    loadMonthData(currentMonthId); // Refresh month to show new expense
+                },
+                error: function(err) {
+                    alert(err.responseJSON.message || "Error recording payment");
+                }
+            });
+        }
+
+        function loadAccounts() {
+            $.get('/api/accounts', function(accs) {
+                accounts = accs;
+                updateAccountDropdowns();
+                renderAccountsList();
+            }).fail(function(xhr) {
+                if (xhr.status === 401) window.location.href = '/login';
+            });
+        }
+
+        function updateAccountDropdowns() {
+            const options = '<option value="">Account...</option>' + accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+            $('#newPaidAccount').html(options);
+            $('#newIncomeAccount').html(options);
+            $('#newPersAccount').html(options);
+        }
+
+        function renderAccountsList() {
+            const list = $('#accountsList');
+            list.empty();
+            accounts.forEach(acc => {
+                list.append(`
+                    <div class="flex justify-between items-center p-2 bg-slate-100 dark:bg-slate-700 rounded">
+                        <span>${acc}</span>
+                        <!-- Delete button could go here if implemented -->
+                    </div>
+                `);
+            });
+        }
+
+        function showAccountsModal() {
+            $('#accountsModal').removeClass('hidden').addClass('flex');
+            renderAccountsList();
+        }
+
+        function closeAccountsModal() {
+            $('#accountsModal').addClass('hidden').removeClass('flex');
+        }
+
+        function handleAddAccount(e) {
+            e.preventDefault();
+            const name = e.target.accountName.value;
+            if (!name) return;
+
+            $.ajax({
+                url: '/api/accounts',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ account: name }),
+                success: function(res) {
+                    e.target.reset();
+                    loadAccounts();
+                    // Also reload current month data as opening balances might need to reflect new account (though initially 0)
+                    if (currentMonthId) loadMonthData(currentMonthId);
+                },
+                error: function(err) {
+                    alert(err.responseJSON.message || "Error adding account");
+                }
+            });
+        }
+    </script>
+</body>
+</html>
