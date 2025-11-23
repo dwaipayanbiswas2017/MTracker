@@ -164,20 +164,20 @@
                 </div>
 
                 <!-- Add New Paid -->
-                <div class="grid grid-cols-12 gap-2 mb-4">
-                    <input type="text" id="newPaidReason" placeholder="Reason" class="input-dark col-span-2">
-                    <div class="col-span-2 flex gap-1">
+                <div class="grid grid-cols-2 md:grid-cols-12 gap-2 mb-4">
+                    <input type="text" id="newPaidReason" placeholder="Reason" class="input-dark col-span-2 md:col-span-3">
+                    <div class="col-span-1 md:col-span-2 flex gap-1">
                         <select id="newPaidCat" class="input-dark w-full">
                             <option value="">Cat...</option>
                         </select>
                         <button onclick="addNewCategory()" class="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded" title="Add Category">+</button>
                     </div>
-                    <select id="newPaidAccount" class="input-dark col-span-2">
+                    <select id="newPaidAccount" class="input-dark col-span-1 md:col-span-2">
                         <option value="">Account...</option>
                     </select>
-                    <input type="date" id="newPaidDate" class="input-dark col-span-2">
-                    <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-2">
-                    <button onclick="addPaid()" class="btn-brand col-span-2 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <input type="date" id="newPaidDate" class="input-dark col-span-1 md:col-span-2">
+                    <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
+                    <button onclick="addPaid()" class="btn-brand col-span-2 md:col-span-1 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -215,13 +215,13 @@
                     <div>
                         <label class="text-xs text-slate-500">Income Sources</label>
                         <div id="incomeList" class="space-y-2"></div>
-                        <div class="flex gap-2 mt-2">
-                            <input type="text" id="newIncomeSource" placeholder="Source" class="input-dark flex-grow">
-                            <select id="newIncomeAccount" class="input-dark w-32">
+                        <div class="grid grid-cols-2 md:flex gap-2 mt-2">
+                            <input type="text" id="newIncomeSource" placeholder="Source" class="input-dark col-span-2 md:flex-grow">
+                            <select id="newIncomeAccount" class="input-dark col-span-1 md:w-32">
                                 <option value="">Account...</option>
                             </select>
-                            <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark w-24">
-                            <button onclick="addIncome()" class="btn-brand"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
+                            <button onclick="addIncome()" class="btn-brand col-span-2 md:w-auto flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
                         </div>
                     </div>
                 </div>
@@ -235,14 +235,14 @@
                 </div>
                 <div class="text-xs text-slate-400 mb-2">Sum deducted from Current Balance as one total.</div>
 
-                <div class="flex gap-2 mb-3">
-                    <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark flex-grow">
-                    <select id="newPersAccount" class="input-dark w-32">
+                <div class="grid grid-cols-2 md:flex gap-2 mb-3">
+                    <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark col-span-2 md:flex-grow">
+                    <select id="newPersAccount" class="input-dark col-span-1 md:w-32">
                         <option value="">Account...</option>
                     </select>
-                    <input type="date" id="newPersDate" class="input-dark w-32">
-                    <input type="number" id="newPersAmount" placeholder="₹" class="input-dark w-24">
-                    <button onclick="addPersonal()" class="btn-brand"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <input type="date" id="newPersDate" class="input-dark col-span-1 md:w-32">
+                    <input type="number" id="newPersAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
+                    <button onclick="addPersonal()" class="btn-brand col-span-1 md:w-auto flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
                 <div class="max-h-48 overflow-y-auto space-y-2 pr-1" id="personalList">
@@ -257,17 +257,17 @@
                     <span class="text-orange-400 font-bold" id="totalPendingDisplay">₹0</span>
                 </div>
 
-                <div class="grid grid-cols-12 gap-2 mb-3">
-                    <input type="text" id="newPendReason" placeholder="Reason" class="input-dark col-span-5">
-                    <div class="col-span-3 flex gap-1">
+                <div class="grid grid-cols-2 md:grid-cols-12 gap-2 mb-3">
+                    <input type="text" id="newPendReason" placeholder="Reason" class="input-dark col-span-2 md:col-span-5">
+                    <div class="col-span-2 md:col-span-3 flex gap-1">
                         <select id="newPendCat" class="input-dark w-full">
                             <option value="">Loading...</option>
                         </select>
                         <button onclick="addNewCategory()" class="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded" title="Add Category">+</button>
                     </div>
                     <!-- <input type="date" id="newPendDate" class="input-dark col-span-2"> -->
-                    <input type="number" id="newPendAmount" placeholder="₹" class="input-dark col-span-2">
-                    <button onclick="addPending()" class="btn-brand col-span-2 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <input type="number" id="newPendAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
+                    <button onclick="addPending()" class="btn-brand col-span-1 md:col-span-2 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
                 <div class="space-y-2" id="pendingList">
@@ -282,10 +282,10 @@
                     <span class="text-purple-400 font-bold" id="totalLongPendingDisplay">₹0</span>
                 </div>
 
-                <div class="flex gap-2 mb-3">
-                    <input type="text" id="newLPReason" placeholder="Item (e.g. Loan)" class="input-dark flex-grow">
-                    <input type="number" id="newLPAmount" placeholder="Total ₹" class="input-dark w-24">
-                    <button onclick="addLongPending()" class="btn-brand bg-purple-600 hover:bg-purple-700"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                <div class="grid grid-cols-2 md:flex gap-2 mb-3">
+                    <input type="text" id="newLPReason" placeholder="Item (e.g. Loan)" class="input-dark col-span-2 md:flex-grow">
+                    <input type="number" id="newLPAmount" placeholder="Total ₹" class="input-dark col-span-1 md:w-24">
+                    <button onclick="addLongPending()" class="btn-brand bg-purple-600 hover:bg-purple-700 col-span-1 md:w-auto flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
                 <div class="space-y-3" id="longPendingList">
