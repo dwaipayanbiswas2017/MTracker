@@ -371,7 +371,7 @@
                     <label for="copyPending">Copy Pending items from current?</label>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="$('#createModal').addClass('hidden')" class="w-full py-2 bg-slate-700 rounded hover:bg-slate-600">Cancel</button>
+                    <button onclick="closeCreateModal()" class="w-full py-2 bg-slate-700 rounded hover:bg-slate-600">Cancel</button>
                     <button onclick="createMonth()" class="w-full py-2 bg-blue-600 rounded hover:bg-blue-500">Create</button>
                 </div>
             </div>
@@ -560,6 +560,11 @@
             const newId = $('#newMonthId').val();
             const copy = $('#copyPending').is(':checked');
 
+            if (!newId.trim()) {
+                alert('Please enter a month ID');
+                return;
+            }
+
             $.ajax({
                 url: '/api/create_month',
                 type: 'POST',
@@ -570,9 +575,9 @@
                     copy_pending: copy
                 }),
                 success: function(res) {
-                    $('#createModal').addClass('hidden');
-                    loadMonths(); // Reloads list and should select new one theoretically
-                    // Force select
+                    closeCreateModal();
+                    loadMonths(); // Reloads list and should select new one
+                    // Force select the new month
                     setTimeout(() => {
                         $('#monthSelect').val(newId).change();
                     }, 500);
@@ -1243,6 +1248,24 @@
                     alert(err.responseJSON.message || "Error adding account");
                 }
             });
+        }
+
+        // --- Modal Functions ---
+        function showCreateModal() {
+            // Set default value for new month (current month + 1 or a suggested format)
+            const now = new Date();
+            const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            const currentMonth = monthNames[now.getMonth()];
+            const currentYear = now.getFullYear().toString().slice(-2);
+            const suggestedId = `${currentMonth}-${currentYear}`;
+
+            $('#newMonthId').val(suggestedId);
+            $('#copyPending').prop('checked', false);
+            $('#createModal').removeClass('hidden').addClass('flex');
+        }
+
+        function closeCreateModal() {
+            $('#createModal').addClass('hidden').removeClass('flex');
         }
     </script>
 </body>
