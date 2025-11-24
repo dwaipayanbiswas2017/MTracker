@@ -22,9 +22,15 @@
     <style>
         body { background-color: #0f172a; color: #f8fafc; }
     </style>
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="flex items-center justify-center h-screen">
     <div class="w-full max-w-md p-4 md:p-8 space-y-6 bg-slate-800 rounded-lg shadow-lg border border-slate-700">
+        <div class="flex items-center gap-2 justify-center mb-6">
+            <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
+            <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
+        </div>
         <h1 class="text-2xl font-bold text-center">Register</h1>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -36,15 +42,15 @@
         <form action="/register" method="POST" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-slate-400">Full Name</label>
-                <input type="text" name="name" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500">
+                <input type="text" name="name" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500" placeholder="Enter your full name">
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-400">Username</label>
-                <input type="text" name="username" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500">
+                <input type="text" name="username" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500" placeholder="Enter Email or Phone number">
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-400">Password</label>
-                <input type="password" name="password" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500">
+                <input type="password" name="password" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500" placeholder="Enter password">
             </div>
             <button type="submit" class="w-full py-2 font-bold text-white bg-blue-600 rounded hover:bg-blue-500">Register</button>
         </form>
@@ -52,5 +58,8 @@
             Already have an account? <a href="/login" class="text-blue-400 hover:underline">Login</a>
         </p>
     </div>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>

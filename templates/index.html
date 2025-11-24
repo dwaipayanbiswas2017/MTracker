@@ -28,6 +28,9 @@
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <!-- PDF Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -58,6 +61,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             font-family: sans-serif;
+            font-size: 1rem;
         }
         .input-dark {
             background-color: var(--input-bg);
@@ -122,21 +126,34 @@
             <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
         </div>
 
-        <div class="flex flex-wrap gap-2 items-center">
-            <select id="monthSelect" class="input-dark w-40">
+        <div class="flex flex-wrap gap-2 items-center justify-center md:justify-end">
+            <select id="monthSelect" class="input-dark w-32 md:w-40 h-10">
                 <option value="">Loading...</option>
             </select>
-            <button onclick="showCreateModal()" class="btn-brand flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i> New Month</button>
-            <button onclick="showAccountsModal()" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded" title="Manage Accounts"><i data-lucide="credit-card" class="w-5 h-5"></i></button>
-            <button onclick="triggerImport()" class="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded"><i data-lucide="upload" class="w-5 h-5"></i></button>
-            <button onclick="exportPDF()" class="bg-slate-600 hover:bg-slate-700 text-white p-2 rounded"><i data-lucide="download" class="w-5 h-5"></i></button>
-            <button id="theme-toggle" class="bg-slate-600 hover:bg-slate-700 text-white p-2 rounded">
-                <i id="theme-icon" data-lucide="sun" class="w-5 h-5"></i>
+
+            <button onclick="showCreateModal()" class="btn-brand flex items-center gap-2 px-4 py-2 h-10 transition-colors" title="Create a new month">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span class="hidden sm:inline font-medium">New Month</span>
             </button>
-            <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded flex items-center gap-1" title="Logout">
-                <i data-lucide="log-out" class="w-5 h-5"></i>
+
+            <button onclick="showAccountsModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Manage Accounts">
+                <i data-lucide="credit-card" class="w-4 h-4"></i>
+                <span class="hidden sm:inline font-medium">Accounts</span>
+            </button>
+
+            <button onclick="exportPDF()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Download PDF Report">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span class="hidden sm:inline font-medium">Export</span>
+            </button>
+
+            <button id="theme-toggle" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded h-10 transition-colors" title="Toggle Theme">
+                <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
+            </button>
+
+            <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Logout">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span class="hidden sm:inline font-medium">Logout</span>
             </a>
-            <input type="file" id="csvInput" class="hidden" accept=".csv" onchange="handleImport(this)">
         </div>
     </div>
 
@@ -146,7 +163,7 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="statsContainer">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6" id="statsContainer">
         <!-- Injected via JS -->
     </div>
 
@@ -155,7 +172,8 @@
 
         <!-- LEFT: Main Paid Expenses -->
         <div class="lg:col-span-2 space-y-4">
-            <div class="card">
+
+            <div class="card border-l-4 border-l-rose-500">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-lg font-semibold flex items-center gap-2">
                         <i data-lucide="check-circle" class="text-emerald-500 w-5 h-5"></i> Paid Expenses
@@ -166,7 +184,7 @@
                 <!-- Add New Paid -->
                 <div class="grid grid-cols-2 md:grid-cols-12 gap-2 mb-4">
                     <input type="text" id="newPaidReason" placeholder="Reason" class="input-dark col-span-2 md:col-span-3">
-                    <div class="col-span-1 md:col-span-2 flex gap-1">
+                    <div class="col-span-2 md:col-span-2 flex gap-1">
                         <select id="newPaidCat" class="input-dark w-full">
                             <option value="">Cat...</option>
                         </select>
@@ -177,24 +195,28 @@
                     </select>
                     <input type="date" id="newPaidDate" class="input-dark col-span-1 md:col-span-2">
                     <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
-                    <button onclick="addPaid()" class="btn-brand col-span-2 md:col-span-1 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <button onclick="addPaid()" class="btn-brand col-span-1 md:col-span-1 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div id="paidTableContainer" class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-800 text-slate-300">
+                        <thead class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                             <tr>
                                 <th class="p-2 rounded-l">Reason</th>
+                                <th class="p-2">Account</th>
                                 <th class="p-2">Category</th>
                                 <th class="p-2">Date</th>
                                 <th class="p-2 text-right">Amount</th>
                                 <th class="p-2 rounded-r w-10"></th>
                             </tr>
                         </thead>
-                        <tbody id="paidList" class="divide-y divide-slate-700">
+                        <tbody id="paidList" class="divide-y divide-slate-200 dark:divide-slate-700">
                             <!-- Rows -->
                         </tbody>
                     </table>
+                </div>
+                <div id="noPaidExpenses" class="hidden text-center text-slate-500 py-8">
+                    No expenses made yet.
                 </div>
             </div>
         </div>
@@ -203,7 +225,7 @@
         <div class="space-y-6">
 
              <!-- Income & Opening Settings -->
-             <div class="card">
+             <div class="card border-l-4 border-l-teal-500">
                 <h3 class="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Income</h3>
                 <div class="space-y-3">
                     <div>
@@ -297,50 +319,120 @@
     </div>
 
     <!-- PDF Report Template (Hidden) -->
-    <div id="pdfReport" class="hidden bg-white text-black p-8 max-w-4xl mx-auto">
-        <div class="flex justify-between items-center mb-8 border-b border-gray-300 pb-4">
-            <div>
-                <h1 class="text-3xl font-bold text-blue-600">MTracker</h1>
-                <div class="text-sm text-gray-500">Statement of Accounts</div>
+    <div id="pdfReport" class="hidden bg-white text-black p-6 max-w-4xl mx-auto font-sans text-xs">
+        <!-- Header -->
+        <div class="flex justify-between items-start mb-4 border-b-2 border-blue-600 pb-4">
+            <div class="flex items-center gap-3">
+                <!-- Logo -->
+                <div class="bg-blue-600 text-white p-2 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-blue-600 tracking-tight">MTracker</h1>
+                    <div class="text-gray-500 text-sm">Statement of Accounts</div>
+                </div>
             </div>
             <div class="text-right">
-                <div class="text-xl font-bold" id="pdfMonthId"></div>
-                <div class="text-sm text-gray-500" id="pdfGeneratedDate"></div>
-                <div class="text-sm font-semibold mt-1" id="pdfUserName">{{ name }}</div>
+                <div class="text-xl font-bold text-gray-800" id="pdfMonthId"></div>
+                <div class="text-xs text-gray-500 mt-1">Generated on <span id="pdfGeneratedDate"></span></div>
+                <div class="text-xs font-semibold text-gray-700 mt-1 bg-gray-100 px-2 py-0.5 rounded-full inline-block">
+                    User: <span id="pdfUserName">{{ name }}</span>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-8 mb-8">
-            <div>
-                <h3 class="font-bold text-gray-700 mb-2">Summary</h3>
-                <table class="w-full text-sm">
-                    <tr><td class="py-1 text-gray-600">Opening Balance</td><td class="text-right font-mono" id="pdfOpening"></td></tr>
-                    <tr><td class="py-1 text-gray-600">Total Income</td><td class="text-right font-mono text-green-600" id="pdfIncome"></td></tr>
-                    <tr><td class="py-1 text-gray-600">Total Expenses</td><td class="text-right font-mono text-red-600" id="pdfExpenses"></td></tr>
-                    <tr class="border-t border-gray-300 font-bold"><td class="py-2">Closing Balance</td><td class="text-right font-mono" id="pdfClosing"></td></tr>
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 gap-6 mb-6">
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                <h3 class="font-bold text-gray-700 mb-2 text-sm border-b border-gray-200 pb-1">Financial Summary</h3>
+                <table class="w-full text-xs">
+                    <tr>
+                        <td class="py-1 text-gray-600">Opening Balance</td>
+                        <td class="text-right font-mono font-medium text-gray-800" id="pdfOpening"></td>
+                    </tr>
+                    <tr>
+                        <td class="py-1 text-gray-600">Total Income</td>
+                        <td class="text-right font-mono font-medium text-green-600" id="pdfIncome"></td>
+                    </tr>
+                    <tr>
+                        <td class="py-1 text-gray-600">Total Expenses</td>
+                        <td class="text-right font-mono font-medium text-red-600" id="pdfExpenses"></td>
+                    </tr>
+                    <tr class="border-t border-gray-300">
+                        <td class="py-2 font-bold text-gray-800">Closing Balance</td>
+                        <td class="text-right font-mono font-bold text-base text-gray-900 pt-2" id="pdfClosing"></td>
+                    </tr>
                 </table>
             </div>
-            <div class="bg-gray-50 p-4 rounded border border-gray-200">
-                 <h3 class="font-bold text-gray-700 mb-2">Net Position</h3>
-                 <div class="text-3xl font-bold text-blue-600" id="pdfNetPosition"></div>
-                 <div class="text-xs text-gray-500 mt-1">Real money in hand</div>
+
+            <div class="flex flex-col justify-center bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
+                 <h3 class="font-bold text-blue-800 mb-1 text-sm">Net Position</h3>
+                 <div class="text-2xl font-bold text-blue-600 my-1" id="pdfNetPosition"></div>
+                 <div class="text-xs text-blue-600/80">Real money in hand at end of period</div>
             </div>
         </div>
 
-        <h3 class="font-bold text-lg mb-4 border-b border-gray-300 pb-2">Transaction History</h3>
-        <table class="w-full text-sm text-left">
+        <!-- Account Details & Chart Section -->
+        <div class="flex gap-6 mb-6 break-inside-avoid items-start">
+            <!-- Account Table -->
+            <div class="flex-1">
+                <h3 class="font-bold text-base text-gray-800 mb-2 flex items-center gap-2">
+                    <span>Bank & Account Details</span>
+                    <div class="h-px bg-gray-200 flex-grow ml-4"></div>
+                </h3>
+                <table class="w-full text-xs text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-600 uppercase text-[10px] tracking-wider border-b border-gray-200">
+                            <th class="p-1.5 font-semibold rounded-tl-lg">Account</th>
+                            <th class="p-1.5 text-right font-semibold">Opening</th>
+                            <th class="p-1.5 text-right font-semibold">Inc</th>
+                            <th class="p-1.5 text-right font-semibold">Exp</th>
+                            <th class="p-1.5 text-right font-semibold rounded-tr-lg">Closing</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pdfAccountSummary" class="divide-y divide-gray-100 border-b border-gray-200">
+                        <!-- Injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Chart -->
+            <div class="w-1/3">
+                <h3 class="font-bold text-base text-gray-800 mb-2 flex items-center gap-2">
+                    <span>Breakdown</span>
+                    <div class="h-px bg-gray-200 flex-grow ml-4"></div>
+                </h3>
+                <div class="w-full">
+                    <canvas id="pdfChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction Table -->
+        <h3 class="font-bold text-base text-gray-800 mb-2 flex items-center gap-2">
+            <span>Transaction History</span>
+            <div class="h-px bg-gray-200 flex-grow ml-4"></div>
+        </h3>
+
+        <table class="w-full text-xs text-left border-collapse">
             <thead>
-                <tr class="bg-gray-100 text-gray-600 uppercase text-xs">
-                    <th class="p-2">Date</th>
-                    <th class="p-2">Description</th>
-                    <th class="p-2">Category</th>
-                    <th class="p-2 text-right">Credit</th>
-                    <th class="p-2 text-right">Debit</th>
+                <tr class="bg-gray-100 text-gray-600 uppercase text-[10px] tracking-wider border-b border-gray-200">
+                    <th class="p-2 font-semibold">Date</th>
+                    <th class="p-2 font-semibold">Description</th>
+                    <th class="p-2 font-semibold">Account</th>
+                    <th class="p-2 font-semibold">Category</th>
+                    <th class="p-2 text-right font-semibold">Credit</th>
+                    <th class="p-2 text-right font-semibold">Debit</th>
                 </tr>
             </thead>
-            <tbody id="pdfTransactionList" class="divide-y divide-gray-200">
+            <tbody id="pdfTransactionList" class="divide-y divide-gray-100">
             </tbody>
         </table>
+
+        <!-- Footer -->
+        <div class="mt-8 pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400 flex justify-between items-center">
+            <span>Generated by MTracker Personal Finance Manager</span>
+        </div>
     </div>
 
     <!-- Modals -->
@@ -365,10 +457,13 @@
         <div class="card w-96 max-w-full m-4">
             <h2 class="text-xl font-bold mb-4">Start New Month</h2>
             <div class="space-y-4">
-                <input type="text" id="newMonthId" placeholder="JAN-26" class="input-dark uppercase">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Select Month</label>
+                    <input type="month" id="newMonthInput" class="input-dark w-full">
+                </div>
                 <div class="flex items-center gap-2">
                     <input type="checkbox" id="copyPending" class="w-4 h-4">
-                    <label for="copyPending">Copy Pending items from current?</label>
+                    <label for="copyPending">Copy Pending items from previous?</label>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="closeCreateModal()" class="w-full py-2 bg-slate-700 rounded hover:bg-slate-600">Cancel</button>
@@ -383,6 +478,8 @@
         let currentData = {};
         let currentMonthId = '';
         let accounts = [];
+        let expenseChart = null;
+        let pdfChart = null;
 
         $(document).ready(function() {
             lucide.createIcons();
@@ -411,6 +508,7 @@
                 $('#theme-icon').attr('data-lucide', 'sun');
             }
             lucide.createIcons();
+            if(currentData && currentMonthId) renderCharts(); // Re-render chart on theme change
         }
 
         function toggleTheme() {
@@ -426,6 +524,7 @@
                 $('#theme-icon').attr('data-lucide', 'moon');
             }
             lucide.createIcons();
+            if(currentData && currentMonthId) renderCharts(); // Re-render chart on theme change
         }
 
 
@@ -459,65 +558,7 @@
             });
         }
 
-        function loadAccounts() {
-            $.get('/api/accounts', function(accs) {
-                accounts = accs;
-                updateAccountDropdowns();
-                renderAccountsList();
-            }).fail(function(xhr) {
-                if (xhr.status === 401) window.location.href = '/login';
-            });
-        }
 
-        function updateAccountDropdowns() {
-            const options = '<option value="">Account...</option>' + accounts.map(a => `<option value="${a}">${a}</option>`).join('');
-            $('#newPaidAccount').html(options);
-            $('#newIncomeAccount').html(options);
-            $('#newPersAccount').html(options);
-        }
-
-        function renderAccountsList() {
-            const list = $('#accountsList');
-            list.empty();
-            accounts.forEach(acc => {
-                list.append(`
-                    <div class="flex justify-between items-center p-2 bg-slate-100 dark:bg-slate-700 rounded">
-                        <span>${acc}</span>
-                        <!-- Delete button could go here if implemented -->
-                    </div>
-                `);
-            });
-        }
-
-        function showAccountsModal() {
-            $('#accountsModal').removeClass('hidden').addClass('flex');
-            renderAccountsList();
-        }
-
-        function closeAccountsModal() {
-            $('#accountsModal').addClass('hidden').removeClass('flex');
-        }
-
-        function handleAddAccount(e) {
-            e.preventDefault();
-            const name = e.target.accountName.value;
-            if (!name) return;
-
-            $.ajax({
-                url: '/api/accounts',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({ name: name }),
-                success: function(res) {
-                    e.target.reset();
-                    loadAccounts();
-                    if (currentMonthId) loadMonthData(currentMonthId);
-                },
-                error: function(err) {
-                    alert(err.responseJSON.message || "Error adding account");
-                }
-            });
-        }
 
         function loadMonths() {
             $.get('/api/months', function(months) {
@@ -528,7 +569,21 @@
                     // Prompt to create or import
                     showCreateModal();
                 } else {
-                    months.forEach(m => sel.append(`<option value="${m}">${m}</option>`));
+                    months.forEach(m => {
+                        // Format display name
+                        let displayName = m;
+                        // Try to parse YYYY-MM or Mon-YY
+                        // Simple heuristic: if it contains '-', try to parse
+                        // We can use a dummy date object to format
+                        // But JS date parsing is tricky.
+                        // Let's try to handle YYYY-MM specifically
+                        if (/^\d{4}-\d{2}$/.test(m)) {
+                            const [y, mo] = m.split('-');
+                            const date = new Date(parseInt(y), parseInt(mo) - 1);
+                            displayName = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                        }
+                        sel.append(`<option value="${m}">${displayName}</option>`);
+                    });
                     loadMonthData(months[0]); // Load first
                 }
             }).fail(function(xhr) {
@@ -557,11 +612,11 @@
         }
 
         function createMonth() {
-            const newId = $('#newMonthId').val();
+            const monthInput = $('#newMonthInput').val(); // YYYY-MM
             const copy = $('#copyPending').is(':checked');
 
-            if (!newId.trim()) {
-                alert('Please enter a month ID');
+            if (!monthInput) {
+                alert('Please select a month');
                 return;
             }
 
@@ -570,16 +625,15 @@
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
-                    new_month_id: newId,
-                    prev_month_id: currentMonthId,
+                    month_input: monthInput,
                     copy_pending: copy
                 }),
                 success: function(res) {
                     closeCreateModal();
-                    loadMonths(); // Reloads list and should select new one
+                    loadMonths(); // Reloads list
                     // Force select the new month
                     setTimeout(() => {
-                        $('#monthSelect').val(newId).change();
+                        $('#monthSelect').val(res.id).change();
                     }, 500);
                 },
                 error: function(err) {
@@ -629,15 +683,18 @@
             const expectedBalance = currentBalance - totalPending;
 
             // --- Calculate Per-Account Balances ---
-            let accountBalances = { ...openingBalances };
+            let initialAccountBalances = { ...openingBalances };
             // Ensure all accounts exist in balances with 0 if not present
-            accounts.forEach(acc => { if (accountBalances[acc] === undefined) accountBalances[acc] = 0; });
+            accounts.forEach(acc => { if (initialAccountBalances[acc] === undefined) initialAccountBalances[acc] = 0; });
 
-            // Add Income
+            // Add Income to Initial
             (currentData.income || []).forEach(item => {
                 const acc = item.account || 'Cash';
-                accountBalances[acc] = (accountBalances[acc] || 0) + parseFloat(item.amount);
+                initialAccountBalances[acc] = (initialAccountBalances[acc] || 0) + parseFloat(item.amount);
             });
+
+            // Current Balance starts from Initial
+            let accountBalances = { ...initialAccountBalances };
 
             // Subtract Paid Expenses
             (currentData.paidExpenses || []).forEach(item => {
@@ -657,26 +714,26 @@
             const allAccounts = new Set([...accounts, ...Object.keys(openingBalances)]);
 
             allAccounts.forEach(acc => {
-                const val = openingBalances[acc] || 0;
+                const val = openingBalances[acc];
                 openingContainer.append(`
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-slate-400">${acc}</span>
                         <input type="number" class="input-dark w-24 text-right p-1 h-6"
                             value="${val}"
-                            onchange="updateOpeningBalance('${acc}', this.value)">
+                            onchange="updateOpeningBalance('${acc}', this.value)" placeholder="0">
                     </div>
                 `);
             });
 
             // Render Income List
             const incomeHtml = (currentData.income || []).map(item => `
-                <div class="flex justify-between items-center text-sm p-2 bg-slate-800/50 rounded group">
+                <div class="flex justify-between items-center text-base p-2 bg-slate-100 dark:bg-slate-800/50 rounded group">
                     <div>
                         <span>${item.source}</span>
-                        <span class="text-xs text-slate-500 ml-2 bg-slate-700 px-1 rounded">${item.account || 'Cash'}</span>
+                        <span class="text-sm text-slate-500 ml-2 bg-slate-200 dark:bg-slate-700 px-1 rounded">${item.account || 'Cash'}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-mono text-green-400">₹${item.amount.toLocaleString()}</span>
+                        <span class="font-mono text-green-600 dark:text-green-400">₹${item.amount.toLocaleString()}</span>
                         <button onclick="deleteItem('income', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
                     </div>
                 </div>
@@ -685,34 +742,75 @@
 
 
             // Render Stats Cards
-            let balanceBreakdown = '';
+            let initialBreakdownHtml = '';
+            for (let acc in initialAccountBalances) {
+                if (initialAccountBalances[acc] !== 0) {
+                     initialBreakdownHtml += `<div class="flex justify-between text-xs text-slate-500 dark:text-slate-400"><span>${acc}</span> <span>₹${initialAccountBalances[acc].toLocaleString()}</span></div>`;
+                }
+            }
+
+            let currentBreakdownHtml = '';
             for (let acc in accountBalances) {
-                balanceBreakdown += `<div class="flex justify-between text-xs text-slate-300"><span>${acc}:</span> <span>₹${accountBalances[acc].toLocaleString()}</span></div>`;
+                 if (accountBalances[acc] !== 0) {
+                    currentBreakdownHtml += `<div class="flex justify-between text-xs text-slate-500 dark:text-slate-400"><span>${acc}</span> <span>₹${accountBalances[acc].toLocaleString()}</span></div>`;
+                 }
             }
 
             $('#statsContainer').html(`
-                <div class="card border-l-4 border-l-slate-400">
-                    <div class="text-slate-400 text-xs uppercase font-bold">Initial Balance</div>
-                    <div class="text-2xl font-bold">₹${totalAvailable.toLocaleString()}</div>
-                    <div class="text-xs text-slate-500">Opening + Income</div>
-                </div>
-                <div class="card border-l-4 border-l-blue-500">
-                    <div class="text-blue-400 text-xs uppercase font-bold">Current Balance</div>
-                    <div class="text-2xl font-bold text-white">₹${currentBalance.toLocaleString()}</div>
-                    <div class="space-y-1 mt-1 border-t border-slate-700 pt-1">
-                        ${balanceBreakdown}
+                <!-- Balance Card -->
+                <div class="card border-l-4 border-l-blue-500 p-4 flex flex-col justify-between gap-4">
+                    <!-- Initial -->
+                    <div class="border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <div>
+                                <div class="text-slate-500 dark:text-slate-400 text-sm uppercase font-bold">Initial Balance</div>
+                                <div class="text-xs text-slate-400">Opening + Income</div>
+                            </div>
+                            <div class="text-2xl font-bold text-slate-700 dark:text-slate-200">₹${totalAvailable.toLocaleString()}</div>
+                        </div>
+                        <div class="mt-1 pl-2 border-l-2 border-slate-200 dark:border-slate-700 space-y-0.5">
+                            ${initialBreakdownHtml}
+                        </div>
+                    </div>
+
+                    <!-- Current -->
+                    <div class="border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <div>
+                                <div class="text-blue-500 text-sm uppercase font-bold">Current Balance</div>
+                                <div class="text-xs text-slate-400">Available Now</div>
+                            </div>
+                            <div class="text-3xl font-bold text-blue-600 dark:text-blue-400">₹${currentBalance.toLocaleString()}</div>
+                        </div>
+                        <div class="mt-1 pl-2 border-l-2 border-blue-200 dark:border-blue-900 space-y-0.5">
+                            ${currentBreakdownHtml}
+                        </div>
+                    </div>
+
+                    <!-- Expected -->
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="text-emerald-500 text-sm uppercase font-bold">Expected Balance</div>
+                            <div class="text-xs text-slate-400">Less: Pending (₹${totalPending.toLocaleString()})</div>
+                        </div>
+                        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹${expectedBalance.toLocaleString()}</div>
                     </div>
                 </div>
-                <div class="card border-l-4 border-l-emerald-500">
-                    <div class="text-emerald-400 text-xs uppercase font-bold">Expected Balance</div>
-                    <div class="text-2xl font-bold">₹${expectedBalance.toLocaleString()}</div>
-                    <div class="text-xs text-slate-500">After pending bills</div>
+
+                <!-- Chart Card -->
+                <div class="card border-l-4 border-l-purple-500 p-4 flex flex-col">
+                    <div class="text-purple-500 text-sm uppercase font-bold mb-2">Expense Analysis</div>
+                    <div class="flex-grow relative w-full min-h-[200px]">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
                 </div>
             `);
 
             $('#totalPersonalDisplay').text('₹' + totalPersonal.toLocaleString());
-            $('#totalPaidDisplay').text('₹' + totalPaidList.toLocaleString());
+            $('#totalPaidDisplay').text('₹' + totalPaid.toLocaleString());
             $('#totalPendingDisplay').text('₹' + totalPending.toLocaleString());
+
+            renderCharts(); // Render Charts
 
             // Render Paid List
             let paidHtml = '';
@@ -722,6 +820,7 @@
                 paidHtml += `
                 <tr class="bg-blue-900/20 border-b border-blue-900/30">
                     <td class="p-2 font-medium text-blue-400">Personal Expenses (Total)</td>
+                    <td class="p-2 text-slate-400 text-xs">-</td>
                     <td class="p-2"><span class="bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded text-xs">Personal</span></td>
                     <td class="p-2 text-slate-400 text-xs">-</td>
                     <td class="p-2 text-right font-mono text-blue-300">₹${totalPersonal.toLocaleString()}</td>
@@ -730,30 +829,36 @@
             }
 
             paidHtml += (currentData.paidExpenses || []).slice().reverse().map(item => `
-                <tr class="border-b border-slate-700 hover:bg-slate-700/50 group">
-                    <td class="p-2">
-                        ${item.reason}
-                        <div class="text-xs text-slate-500">${item.account || 'Cash'}</div>
-                    </td>
-                    <td class="p-2"><span class="bg-slate-700 px-2 py-1 rounded text-xs">${item.category}</span></td>
-                    <td class="p-2 text-slate-400 text-xs">${item.date}</td>
-                    <td class="p-2 text-right font-mono text-emerald-400">₹${item.amount.toLocaleString()}</td>
+                <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50 group">
+                    <td class="p-2 font-medium">${item.reason}</td>
+                    <td class="p-2 text-sm text-slate-500">${item.account || 'Cash'}</td>
+                    <td class="p-2"><span class="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-sm">${item.category}</span></td>
+                    <td class="p-2 text-slate-500 dark:text-slate-400 text-sm">${item.date}</td>
+                    <td class="p-2 text-right font-mono text-emerald-600 dark:text-emerald-400">₹${item.amount.toLocaleString()}</td>
                     <td class="p-2 text-right">
                         <button onclick="deleteItem('paidExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
                 </tr>`).join('');
-            $('#paidList').html(paidHtml);
+
+            if (paidHtml.trim() === '') {
+                $('#paidTableContainer').addClass('hidden');
+                $('#noPaidExpenses').removeClass('hidden');
+            } else {
+                $('#paidTableContainer').removeClass('hidden');
+                $('#noPaidExpenses').addClass('hidden');
+                $('#paidList').html(paidHtml);
+            }
 
             // Render Personal List
             const persHtml = (currentData.personalExpenses || []).slice().reverse().map(item => `
-                <div class="flex justify-between items-center text-sm p-2 bg-slate-800/50 rounded group">
+                <div class="flex justify-between items-center text-base p-2 bg-slate-100 dark:bg-slate-800/50 rounded group">
                     <div>
                         <span>${item.reason}</span>
-                        <div class="text-xs text-slate-400">${item.date || ''}</div>
-                        <div class="text-xs text-slate-500">${item.account || 'Cash'}</div>
+                        <div class="text-sm text-slate-500 dark:text-slate-400">${item.date || ''}</div>
+                        <div class="text-sm text-slate-500">${item.account || 'Cash'}</div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-mono text-blue-300">₹${item.amount}</span>
+                        <span class="font-mono text-blue-600 dark:text-blue-300">₹${item.amount}</span>
                         <button onclick="deleteItem('personalExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
                     </div>
                 </div>
@@ -762,16 +867,16 @@
 
             // Render Pending List
             const pendHtml = (currentData.pendingExpenses || []).map(item => `
-                <div class="flex justify-between items-center p-3 bg-slate-800 border border-slate-700 rounded shadow-sm group">
+                <div class="flex justify-between items-center p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm group">
                     <div>
                         <div class="font-medium">${item.reason}</div>
-                        <div class="text-xs text-slate-400">${item.date || ''}</div>
-                        <div class="text-xs text-orange-400">${item.category}</div>
+                        <div class="text-sm text-slate-500 dark:text-slate-400">${item.date || ''}</div>
+                        <div class="text-sm text-orange-500 dark:text-orange-400">${item.category}</div>
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="text-right">
                             <div class="font-bold">₹${item.amount}</div>
-                            <div class="text-xs text-slate-500">${item.mode || 'Online'}</div>
+                            <div class="text-sm text-slate-500">${item.mode || 'Online'}</div>
                         </div>
                         <button onclick="payItem('${item.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded" title="Mark Paid">
                             <i data-lucide="check" class="w-4 h-4"></i>
@@ -785,6 +890,94 @@
             $('#pendingList').html(pendHtml);
 
             lucide.createIcons();
+        }
+
+        function renderCharts() {
+            if (!currentData) return;
+
+            // 1. Aggregate Data
+            const categoryTotals = {};
+
+            // Paid Expenses
+            (currentData.paidExpenses || []).forEach(item => {
+                const cat = item.category || 'Uncategorized';
+                categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(item.amount);
+            });
+
+            // Personal Expenses (Group as 'Personal')
+            const personalTotal = (currentData.personalExpenses || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
+            if (personalTotal > 0) {
+                categoryTotals['Personal'] = (categoryTotals['Personal'] || 0) + personalTotal;
+            }
+
+            const labels = Object.keys(categoryTotals);
+            const data = Object.values(categoryTotals);
+
+            if (labels.length === 0) {
+                // Clear chart if no data
+                if (expenseChart) {
+                    expenseChart.destroy();
+                    expenseChart = null;
+                }
+                return;
+            }
+
+            // Calculate Percentages
+            const totalExp = data.reduce((a, b) => a + b, 0);
+            const labelsWithPct = labels.map((l, i) => {
+                const pct = totalExp > 0 ? ((data[i] / totalExp) * 100).toFixed(0) : 0;
+                return `${l} ${pct}%`;
+            });
+
+            // 2. Determine Colors based on Theme
+            const isDark = $('html').hasClass('dark');
+            const textColor = isDark ? '#cbd5e1' : '#334155'; // slate-300 : slate-700
+
+            // Palette
+            const bgColors = [
+                '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+                '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#06b6d4'
+            ];
+
+            // 3. Render UI Chart
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+
+            if (expenseChart) expenseChart.destroy();
+
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labelsWithPct,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: bgColors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: textColor,
+                                font: { size: 10 },
+                                boxWidth: 8,
+                                padding: 5
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return labels[context.dataIndex] + ': ₹' + context.raw.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    layout: { padding: 2 }
+                }
+            });
         }
 
         // --- Actions ---
@@ -906,6 +1099,14 @@
             const item = currentData.pendingExpenses.find(i => String(i.id) === String(id));
             if (!item) return;
 
+            // Ask for Account
+            const accList = accounts.join(', ');
+            const account = prompt(`Marking "${item.reason}" as Paid.\nSelect Account (${accList}):`, "Cash");
+
+            if (account === null) return; // Cancelled
+
+            const finalAccount = account.trim() || 'Cash';
+
             // Remove from Pending
             currentData.pendingExpenses = currentData.pendingExpenses.filter(i => String(i.id) !== String(id));
 
@@ -917,7 +1118,7 @@
                 category: item.category,
                 amount: item.amount,
                 date: new Date().toISOString().split('T')[0],
-                account: 'Cash'
+                account: finalAccount
             });
 
             saveData();
@@ -990,6 +1191,114 @@
             $('#pdfClosing').text('₹' + closing.toLocaleString());
             $('#pdfNetPosition').text('₹' + closing.toLocaleString());
 
+            // --- Calculate Per-Account Stats for PDF ---
+            let accountStats = {};
+
+            // Initialize with Opening Balances
+            let openingBalances = {};
+            if (typeof currentData.openingBalance === 'object' && currentData.openingBalance !== null) {
+                openingBalances = currentData.openingBalance;
+            } else {
+                openingBalances['Cash'] = parseFloat(currentData.openingBalance || 0);
+            }
+
+            // Get all unique accounts involved
+            const allAccounts = new Set([...accounts, ...Object.keys(openingBalances)]);
+
+            allAccounts.forEach(acc => {
+                accountStats[acc] = {
+                    opening: parseFloat(openingBalances[acc] || 0),
+                    income: 0,
+                    expense: 0
+                };
+            });
+
+            // Add Income
+            (currentData.income || []).forEach(item => {
+                const acc = item.account || 'Cash';
+                if (!accountStats[acc]) accountStats[acc] = { opening: 0, income: 0, expense: 0 };
+                accountStats[acc].income += parseFloat(item.amount);
+            });
+
+            // Add Expenses (Paid + Personal)
+            (currentData.paidExpenses || []).forEach(item => {
+                const acc = item.account || 'Cash';
+                if (!accountStats[acc]) accountStats[acc] = { opening: 0, income: 0, expense: 0 };
+                accountStats[acc].expense += parseFloat(item.amount);
+            });
+             (currentData.personalExpenses || []).forEach(item => {
+                const acc = item.account || 'Cash';
+                if (!accountStats[acc]) accountStats[acc] = { opening: 0, income: 0, expense: 0 };
+                accountStats[acc].expense += parseFloat(item.amount);
+            });
+
+            // Generate Account Summary Rows
+            const accountRows = Object.keys(accountStats).map(acc => {
+                const s = accountStats[acc];
+                const closing = s.opening + s.income - s.expense;
+                // Only show if there's any activity or non-zero balance
+                if (s.opening === 0 && s.income === 0 && s.expense === 0 && closing === 0) return '';
+
+                return `
+                    <tr>
+                        <td class="p-3 font-medium text-gray-800">${acc}</td>
+                        <td class="p-3 text-right text-gray-600">₹${s.opening.toLocaleString()}</td>
+                        <td class="p-3 text-right text-green-600">₹${s.income.toLocaleString()}</td>
+                        <td class="p-3 text-right text-red-600">₹${s.expense.toLocaleString()}</td>
+                        <td class="p-3 text-right font-bold text-gray-900">₹${closing.toLocaleString()}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            $('#pdfAccountSummary').html(accountRows);
+
+            // --- Render PDF Chart ---
+            // We need to render this specifically for the PDF export
+            // We'll use a light theme style for the PDF regardless of current UI theme
+
+            const categoryTotals = {};
+            (currentData.paidExpenses || []).forEach(item => {
+                const cat = item.category || 'Uncategorized';
+                categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(item.amount);
+            });
+            const personalTotal = (currentData.personalExpenses || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
+            if (personalTotal > 0) categoryTotals['Personal'] = (categoryTotals['Personal'] || 0) + personalTotal;
+
+            const labels = Object.keys(categoryTotals);
+            const data = Object.values(categoryTotals);
+            const bgColors = [
+                '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+                '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#06b6d4'
+            ];
+
+            if (labels.length > 0) {
+                const pdfCtx = document.getElementById('pdfChart').getContext('2d');
+                if (pdfChart) pdfChart.destroy();
+
+                pdfChart = new Chart(pdfCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: bgColors,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        animation: false, // Disable animation for PDF capture
+                        plugins: {
+                            legend: {
+                                position: 'bottom', // Bottom legend for compact PDF view
+                                labels: { color: '#334155', font: { size: 10 }, boxWidth: 10 }
+                            }
+                        },
+                        layout: { padding: 0 }
+                    }
+                });
+            }
+
             // 3. Build Transaction List
             let transactions = [];
 
@@ -1000,6 +1309,7 @@
                     fullDate: 'N/A',
                     desc: item.source,
                     cat: 'Income',
+                    account: item.account || 'Cash',
                     credit: item.amount,
                     debit: 0,
                     type: 'income'
@@ -1013,6 +1323,7 @@
                     fullDate: item.date || 'N/A',
                     desc: item.reason,
                     cat: item.category,
+                    account: item.account || 'Cash',
                     credit: 0,
                     debit: item.amount,
                     type: 'expense'
@@ -1026,6 +1337,7 @@
                     fullDate: item.date || 'N/A',
                     desc: item.reason,
                     cat: 'Personal',
+                    account: item.account || 'Cash',
                     credit: 0,
                     debit: item.amount,
                     type: 'personal'
@@ -1041,12 +1353,13 @@
 
             // Render Rows
             const rows = transactions.map(t => `
-                <tr>
-                    <td class="p-2 text-gray-500">${t.fullDate}</td>
-                    <td class="p-2 font-medium">${t.desc}</td>
-                    <td class="p-2 text-xs text-gray-500 uppercase">${t.cat}</td>
-                    <td class="p-2 text-right font-mono text-green-600">${t.credit > 0 ? '₹' + t.credit.toLocaleString() : ''}</td>
-                    <td class="p-2 text-right font-mono text-red-600">${t.debit > 0 ? '₹' + t.debit.toLocaleString() : ''}</td>
+                <tr class="hover:bg-gray-50">
+                    <td class="p-3 text-gray-500 font-mono text-xs">${t.fullDate}</td>
+                    <td class="p-3 font-medium text-gray-800">${t.desc}</td>
+                    <td class="p-3 text-gray-600 text-xs">${t.account}</td>
+                    <td class="p-3 text-xs text-gray-500 uppercase tracking-wide"><span class="bg-gray-100 px-2 py-1 rounded">${t.cat}</span></td>
+                    <td class="p-3 text-right font-mono text-green-600 font-medium">${t.credit > 0 ? '₹' + t.credit.toLocaleString() : ''}</td>
+                    <td class="p-3 text-right font-mono text-red-600 font-medium">${t.debit > 0 ? '₹' + t.debit.toLocaleString() : ''}</td>
                 </tr>
             `).join('');
 
@@ -1056,17 +1369,29 @@
             const element = document.getElementById('pdfReport');
             element.classList.remove('hidden'); // Show temporarily
 
-            const opt = {
-                margin: 0.5,
-                filename: `Statement_${currentMonthId}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
+            // Wait for chart to render (even with animation: false, it might need a tick)
+            setTimeout(() => {
+                const opt = {
+                    margin: 0.3,
+                    filename: `Statement_${currentMonthId}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                };
 
-            html2pdf().set(opt).from(element).save().then(() => {
-                element.classList.add('hidden'); // Hide again
-            });
+                html2pdf().set(opt).from(element).toPdf().get('pdf').then(function(pdf) {
+                    const totalPages = pdf.internal.getNumberOfPages();
+                    for (let i = 1; i <= totalPages; i++) {
+                        pdf.setPage(i);
+                        pdf.setFontSize(8);
+                        pdf.setTextColor(150);
+                        pdf.text('Page ' + i + ' of ' + totalPages, pdf.internal.pageSize.getWidth() - 1, pdf.internal.pageSize.getHeight() - 0.3);
+                    }
+                }).save().then(() => {
+                    element.classList.add('hidden'); // Hide again
+                });
+            }, 100);
         }
 
         function loadLongPending() {
@@ -1082,20 +1407,20 @@
                     const percent = Math.min(100, (item.paidAmount / item.totalAmount) * 100);
 
                     list.append(`
-                        <div class="p-3 bg-slate-800 border border-slate-700 rounded shadow-sm group">
+                        <div class="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm group">
                             <div class="flex justify-between items-start mb-2">
                                 <div>
                                     <div class="font-medium">${item.reason}</div>
-                                    <div class="text-xs text-slate-400">Total: ₹${item.totalAmount.toLocaleString()}</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">Total: ₹${item.totalAmount.toLocaleString()}</div>
                                 </div>
                                 <div class="text-right">
-                                    <div class="font-bold text-purple-400">₹${item.remainingAmount.toLocaleString()}</div>
+                                    <div class="font-bold text-purple-600 dark:text-purple-400">₹${item.remainingAmount.toLocaleString()}</div>
                                     <div class="text-xs text-slate-500">Remaining</div>
                                 </div>
                             </div>
 
                             <!-- Progress Bar -->
-                            <div class="w-full bg-slate-700 rounded-full h-1.5 mb-3">
+                            <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mb-3">
                                 <div class="bg-purple-500 h-1.5 rounded-full" style="width: ${percent}%"></div>
                             </div>
 
@@ -1252,14 +1577,13 @@
 
         // --- Modal Functions ---
         function showCreateModal() {
-            // Set default value for new month (current month + 1 or a suggested format)
+            // Set default value for new month (current month)
             const now = new Date();
-            const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-            const currentMonth = monthNames[now.getMonth()];
-            const currentYear = now.getFullYear().toString().slice(-2);
-            const suggestedId = `${currentMonth}-${currentYear}`;
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const currentMonthVal = `${yyyy}-${mm}`;
 
-            $('#newMonthId').val(suggestedId);
+            $('#newMonthInput').val(currentMonthVal);
             $('#copyPending').prop('checked', false);
             $('#createModal').removeClass('hidden').addClass('flex');
         }

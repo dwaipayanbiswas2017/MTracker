@@ -18,6 +18,7 @@ if not os.path.exists(DATA_DIR):
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.login_message = None # Disable default login message
 
 # --- User Management ---
 
@@ -52,6 +53,36 @@ def load_user(user_id):
     return None
 
 # --- Data Management ---
+def parse_month_date(date_str):
+    formats = [
+        '%b-%y',       # Nov-25
+        '%b-%Y',       # Nov-2025
+        '%B-%y',       # November-25
+        '%B-%Y',       # November-2025
+        '%m-%Y',       # 11-2025
+        '%m-%y',       # 11-25
+        '%Y-%m',       # 2025-11
+        '%b %y',       # Nov 25
+        '%b %Y',       # Nov 2025
+    ]
+
+    # Try as provided
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            pass
+
+    # Try Title Case (for NOV-25 -> Nov-25)
+    date_str_title = date_str.title()
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str_title, fmt)
+        except ValueError:
+            pass
+
+    return None
+
 def get_user_data_file():
     return os.path.join(DATA_DIR, f"{current_user.id}.json")
 
@@ -71,7 +102,7 @@ def load_data():
             data["categories"] = ["Bills", "Food", "Family", "EMI", "CC", "Other"]
         # Ensure accounts exist
         if "accounts" not in data:
-            data["accounts"] = ["Cash", "Bank"]
+            data["accounts"] = ["Cash"]
         return data
 
 def save_data(data):
@@ -194,15 +225,100 @@ def add_account():
 @login_required
 def get_months():
     data = load_data()
-    # Filter out non-month keys like 'categories' and '_longPending'
-    months = [k for k in data.keys() if k not in ['categories', '_longPending']]
+    # Filter out non-month keys like 'categories', 'accounts' and '_longPending'
+    months = [k for k in data.keys() if k not in ['categories', 'accounts', '_longPending']]
+
+    def sort_key(m):
+        d = parse_month_date(m)
+        # If parse fails, put it at the start (or end?) - let's put at start to be visible
+        return d if d else datetime.min
+
+    months.sort(key=sort_key)
+
+    current_month_str = datetime.now().strftime('%Y-%m')
+
+    # Check if current month exists (using robust parse to check equivalence)
+    now = datetime.now()
+    current_month_exists = False
+    for m in months:
+        d = parse_month_date(m)
+        if d and d.year == now.year and d.month == now.month:
+            current_month_exists = True
+            break
+
+    if not current_month_exists:
+        # If the current month doesn't exist, add it and re-sort
+        months.append(current_month_str)
+        months.sort(key=sort_key)
+
     return jsonify(months)
 
 @app.route('/api/month/<month_id>', methods=['GET'])
 @login_required
 def get_month_data(month_id):
-    data = load_data()
-    return jsonify(data.get(month_id, {}))
+    all_data = load_data()
+
+    if month_id in all_data:
+        return jsonify(all_data.get(month_id, {}))
+
+    # ---[ AUTO-CREATE MONTH LOGIC ]---
+    # If month_id doesn't exist, create it on the fly.
+    new_month_date = parse_month_date(month_id)
+    if not new_month_date:
+        return jsonify({"status": "error", "message": "Invalid month format"}), 400
+
+    # Find the most recent month before the new one to be its predecessor.
+    prev_month_id = None
+    latest_prev_date = None
+
+    month_keys = [k for k in all_data.keys() if k not in ['categories', 'accounts', '_longPending']]
+    for key in month_keys:
+        d = parse_month_date(key)
+        if d:
+            if d < new_month_date:
+                if latest_prev_date is None or d > latest_prev_date:
+                    latest_prev_date = d
+                    prev_month_id = key
+
+    # If a previous month is found, calculate the closing balance.
+    if prev_month_id:
+        prev_data = all_data.get(prev_month_id, {})
+        prev_opening = prev_data.get('openingBalance', {})
+        if isinstance(prev_opening, (int, float)):
+            prev_opening = {'Cash': float(prev_opening)}
+
+        closing_balances = prev_opening.copy()
+
+        for inc in prev_data.get('income', []):
+            acc = inc.get('account', 'Cash')
+            closing_balances[acc] = closing_balances.get(acc, 0) + float(inc.get('amount', 0))
+        for exp in prev_data.get('paidExpenses', []):
+            acc = exp.get('account', 'Cash')
+            closing_balances[acc] = closing_balances.get(acc, 0) - float(exp.get('amount', 0))
+        for pers in prev_data.get('personalExpenses', []):
+            acc = pers.get('account', 'Cash')
+            closing_balances[acc] = closing_balances.get(acc, 0) - float(pers.get('amount', 0))
+
+        opening_balance = closing_balances
+        # Copy pending expenses from the previous month
+        pending_expenses = prev_data.get('pendingExpenses', [])
+    else:
+        # No previous month, so start fresh.
+        opening_balance = {}
+        pending_expenses = []
+
+    new_data = {
+        "income": [],
+        "openingBalance": opening_balance,
+        "paidExpenses": [],
+        "personalExpenses": [],
+        "pendingExpenses": pending_expenses
+    }
+
+    all_data[month_id] = new_data
+    save_data(all_data)
+
+    return jsonify(new_data)
 
 @app.route('/api/save', methods=['POST'])
 @login_required
@@ -220,14 +336,41 @@ def save_month_data():
 @login_required
 def create_month():
     req = request.json
-    new_month_id = req.get('new_month_id')
-    prev_month_id = req.get('prev_month_id')
+    month_input = req.get('month_input') # Expected format: YYYY-MM
     copy_pending = req.get('copy_pending', False)
+
+    if not month_input:
+        return jsonify({"status": "error", "message": "Month selection required"}), 400
+
+    # Validate format YYYY-MM
+    try:
+        new_month_date = datetime.strptime(month_input, '%Y-%m')
+        # We will use the YYYY-MM format as the ID for new months to keep it standard
+        new_month_id = month_input
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid date format"}), 400
 
     all_data = load_data()
 
-    if new_month_id in all_data:
-        return jsonify({"status": "error", "message": "Month already exists"}), 400
+    # Check if month already exists (check for overlap with existing keys)
+    # We check if any existing key represents the same month/year
+    for k in all_data.keys():
+        if k in ['categories', 'accounts', '_longPending']: continue
+        d = parse_month_date(k)
+        if d and d.year == new_month_date.year and d.month == new_month_date.month:
+             return jsonify({"status": "error", "message": f"Month {k} already exists"}), 400
+
+    # Find previous month automatically
+    prev_month_id = None
+    latest_prev_date = None
+
+    month_keys = [k for k in all_data.keys() if k not in ['categories', 'accounts', '_longPending']]
+    for key in month_keys:
+        d = parse_month_date(key)
+        if d and d < new_month_date:
+            if latest_prev_date is None or d > latest_prev_date:
+                latest_prev_date = d
+                prev_month_id = key
 
     prev_data = all_data.get(prev_month_id, {})
 
@@ -273,7 +416,7 @@ def create_month():
     all_data[new_month_id] = new_data
     save_data(all_data)
 
-    return jsonify({"status": "success", "data": new_data})
+    return jsonify({"status": "success", "data": new_data, "id": new_month_id})
 
 @app.route('/api/delete_month', methods=['POST'])
 @login_required
