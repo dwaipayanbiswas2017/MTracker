@@ -473,6 +473,25 @@
         </div>
     </div>
 
+    <div id="payPendingModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="card w-96 max-w-full m-4">
+            <h2 class="text-xl font-bold mb-4">Mark as Paid</h2>
+            <p class="mb-4 text-slate-400" id="payPendingReason"></p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Select Account</label>
+                    <select id="payPendingAccount" class="input-dark w-full">
+                        <!-- Options -->
+                    </select>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="closePayPendingModal()" class="w-full py-2 bg-slate-700 rounded hover:bg-slate-600">Cancel</button>
+                    <button onclick="confirmPayPending()" class="w-full py-2 bg-emerald-600 rounded hover:bg-emerald-500">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>
         let currentData = {};
@@ -480,6 +499,7 @@
         let accounts = [];
         let expenseChart = null;
         let pdfChart = null;
+        let pendingItemToPay = null;
 
         $(document).ready(function() {
             lucide.createIcons();
@@ -791,7 +811,7 @@
                     <div class="flex justify-between items-center">
                         <div>
                             <div class="text-emerald-500 text-sm uppercase font-bold">Expected Balance</div>
-                            <div class="text-xs text-slate-400">Less: Pending (₹${totalPending.toLocaleString()})</div>
+                            <div class="text-xs text-slate-400">Pending (₹${totalPending.toLocaleString()})</div>
                         </div>
                         <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹${expectedBalance.toLocaleString()}</div>
                     </div>
@@ -802,6 +822,9 @@
                     <div class="text-purple-500 text-sm uppercase font-bold mb-2">Expense Analysis</div>
                     <div class="flex-grow relative w-full min-h-[200px]">
                         <canvas id="expenseChart"></canvas>
+                        <div id="expenseChartNoData" class="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm hidden">
+                            No data available yet to render the chart!
+                        </div>
                     </div>
                 </div>
             `);
@@ -914,12 +937,19 @@
             const data = Object.values(categoryTotals);
 
             if (labels.length === 0) {
-                // Clear chart if no data
+                // No data: destroy existing chart and show placeholder
                 if (expenseChart) {
                     expenseChart.destroy();
                     expenseChart = null;
                 }
+                // Hide canvas and show placeholder
+                $('#expenseChart').hide();
+                $('#expenseChartNoData').removeClass('hidden').show();
                 return;
+            } else {
+                // Has data: ensure canvas visible and hide placeholder
+                $('#expenseChartNoData').hide();
+                $('#expenseChart').show();
             }
 
             // Calculate Percentages
@@ -1099,29 +1129,51 @@
             const item = currentData.pendingExpenses.find(i => String(i.id) === String(id));
             if (!item) return;
 
-            // Ask for Account
-            const accList = accounts.join(', ');
-            const account = prompt(`Marking "${item.reason}" as Paid.\nSelect Account (${accList}):`, "Cash");
+            pendingItemToPay = item;
 
-            if (account === null) return; // Cancelled
+            $('#payPendingReason').text(`Paying: ${item.reason} (₹${item.amount})`);
 
-            const finalAccount = account.trim() || 'Cash';
+            // Populate accounts
+            const options = accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+            $('#payPendingAccount').html(options);
+
+            // Try to select 'Bank' or 'Cash' as default if available, otherwise first
+            if (accounts.includes('Bank')) $('#payPendingAccount').val('Bank');
+            else if (accounts.includes('Cash')) $('#payPendingAccount').val('Cash');
+
+            $('#payPendingModal').removeClass('hidden').addClass('flex');
+        }
+
+        function closePayPendingModal() {
+            $('#payPendingModal').addClass('hidden').removeClass('flex');
+            pendingItemToPay = null;
+        }
+
+        function confirmPayPending() {
+            if (!pendingItemToPay) return;
+
+            const account = $('#payPendingAccount').val();
+            if (!account) {
+                alert("Please select an account");
+                return;
+            }
 
             // Remove from Pending
-            currentData.pendingExpenses = currentData.pendingExpenses.filter(i => String(i.id) !== String(id));
+            currentData.pendingExpenses = currentData.pendingExpenses.filter(i => String(i.id) !== String(pendingItemToPay.id));
 
             // Add to Paid
             if (!currentData.paidExpenses) currentData.paidExpenses = [];
             currentData.paidExpenses.push({
                 id: Date.now(),
-                reason: item.reason,
-                category: item.category,
-                amount: item.amount,
+                reason: pendingItemToPay.reason,
+                category: pendingItemToPay.category,
+                amount: pendingItemToPay.amount,
                 date: new Date().toISOString().split('T')[0],
-                account: finalAccount
+                account: account
             });
 
             saveData();
+            closePayPendingModal();
         }
         function updateOpeningBalance(account, value) {
             if (typeof currentData.openingBalance !== 'object' || currentData.openingBalance === null) {
