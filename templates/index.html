@@ -127,6 +127,71 @@
             color: #64748b;
         }
 
+        /* Accordion Styles */
+        .accordion-section {
+            background-color: var(--card-bg);
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .accordion-header {
+            cursor: pointer;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+        .accordion-header:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        .dark .accordion-header:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease;
+            padding: 0 1rem;
+        }
+        .accordion-content.expanded {
+            max-height: 2000px;
+            padding: 0 1rem 1rem 1rem;
+        }
+        .accordion-chevron {
+            transition: transform 0.3s ease;
+        }
+        .accordion-chevron.rotated {
+            transform: rotate(180deg);
+        }
+        .add-form-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, margin 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+        .add-form-container.visible {
+            max-height: 300px;
+            margin-bottom: 1rem;
+            opacity: 1;
+        }
+        .btn-toggle-form {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+        .btn-toggle-form i {
+            transition: transform 0.2s ease;
+        }
+        .btn-toggle-form.active i {
+            transform: rotate(45deg);
+        }
+
     </style>
 </head>
 <body class="p-4 md:p-6 pb-20">
@@ -180,163 +245,262 @@
     </div>
 
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <!-- LEFT: Main Paid Expenses -->
-        <div class="lg:col-span-2 space-y-4">
+        <!-- LEFT Column -->
+        <div class="space-y-4">
 
-            <div class="card border-l-4 border-l-rose-500">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold flex items-center gap-2">
-                        <i data-lucide="check-circle" class="text-emerald-500 w-5 h-5"></i> Paid Expenses
-                    </h2>
-                    <span class="text-sm text-slate-400" id="totalPaidDisplay">₹0</span>
-                </div>
-
-                <!-- Add New Paid -->
-                <div class="grid grid-cols-2 md:grid-cols-12 gap-2 mb-4">
-                    <input type="text" id="newPaidReason" placeholder="Reason" class="input-dark col-span-2 md:col-span-3">
-                    <div class="col-span-2 md:col-span-2 flex gap-1">
-                        <select id="newPaidCat" class="input-dark w-full">
-                            <option value="">Cat...</option>
-                        </select>
-                        <button onclick="addNewCategory()" class="btn-add bg-rose-500 hover:bg-rose-600 text-white" title="Add Category">+</button>
+            <!-- Paid Expenses Accordion -->
+            <div class="accordion-section border-l-4 border-l-rose-500">
+                <div class="accordion-header" onclick="toggleAccordion('paidExpenses')">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="receipt" class="text-rose-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Paid Expenses</h2>
                     </div>
-                    <select id="newPaidAccount" class="input-dark col-span-1 md:col-span-2">
-                        <option value="">Account...</option>
-                    </select>
-                    <input type="date" id="newPaidDate" class="input-dark col-span-1 md:col-span-2">
-                    <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
-                    <button onclick="addPaid()" class="btn-add bg-rose-500 hover:bg-rose-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-rose-500" id="totalPaidDisplay">₹0</span>
+                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="paidExpenses-chevron"></i>
+                    </div>
                 </div>
+                <div class="accordion-content" id="paidExpenses-content">
+                    <!-- Toggle Add Form Button -->
+                    <div class="flex justify-end mb-2">
+                        <button onclick="toggleAddForm('paid')" class="btn-toggle-form bg-rose-500 hover:bg-rose-600 text-white" id="paid-toggle-btn" title="Add New Expense">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </button>
+                    </div>
 
-                <div id="paidTableContainer" class="overflow-x-auto">
-                    <div class="w-full">
-                        <table class="w-full text-left text-sm border-separate" style="border-spacing:0">
-                            <thead class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                <tr>
-                                    <th class="p-2 w-10 sticky top-0 bg-inherit">#</th>
-                                    <th class="p-2">Reason</th>
-                                    <th class="p-2">Account</th>
-                                    <th class="p-2">Category</th>
-                                    <th class="p-2">Date</th>
-                                    <th class="p-2 text-right">Amount</th>
-                                    <th class="p-2 rounded-r w-10"></th>
-                                </tr>
-                            </thead>
-                        </table>
+                    <!-- Add New Paid Form (Hidden by default) -->
+                    <div class="add-form-container" id="paid-form">
+                        <div class="p-3 bg-rose-50 dark:bg-rose-900/20 rounded-lg border border-rose-200 dark:border-rose-800">
+                            <div class="grid grid-cols-2 md:grid-cols-12 gap-2">
+                                <input type="text" id="newPaidReason" placeholder="Reason" class="input-dark col-span-2 md:col-span-3">
+                                <div class="col-span-2 md:col-span-2 flex gap-1">
+                                    <select id="newPaidCat" class="input-dark w-full">
+                                        <option value="">Cat...</option>
+                                    </select>
+                                    <button onclick="addNewCategory()" class="btn-add bg-rose-500 hover:bg-rose-600 text-white" title="Add Category">+</button>
+                                </div>
+                                <select id="newPaidAccount" class="input-dark col-span-1 md:col-span-2">
+                                    <option value="">Account...</option>
+                                </select>
+                                <input type="date" id="newPaidDate" class="input-dark col-span-1 md:col-span-2">
+                                <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
+                                <button onclick="addPaid()" class="btn-add bg-rose-500 hover:bg-rose-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    </div>
 
-                        <div id="paidTableScroll" class="overflow-y-auto w-full" style="max-height: 360px;">
-                            <table class="w-full text-left text-sm">
-                                <tbody id="paidList" class="divide-y divide-slate-200 dark:divide-slate-700">
-                                    <!-- Rows -->
-                                </tbody>
+                    <div id="paidTableContainer" class="overflow-x-auto">
+                        <div class="w-full">
+                            <table class="w-full text-left text-sm border-separate" style="border-spacing:0">
+                                <thead class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                    <tr>
+                                        <th class="p-2 w-10 sticky top-0 bg-inherit">#</th>
+                                        <th class="p-2">Reason</th>
+                                        <th class="p-2">Account</th>
+                                        <th class="p-2">Category</th>
+                                        <th class="p-2">Date</th>
+                                        <th class="p-2 text-right">Amount</th>
+                                        <th class="p-2 rounded-r w-10"></th>
+                                    </tr>
+                                </thead>
                             </table>
+
+                            <div id="paidTableScroll" class="overflow-y-auto w-full" style="max-height: 360px;">
+                                <table class="w-full text-left text-sm">
+                                    <tbody id="paidList" class="divide-y divide-slate-200 dark:divide-slate-700">
+                                        <!-- Rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="noPaidExpenses" class="hidden text-center text-slate-500 py-8">
+                        No expenses made yet.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Daily Log Accordion -->
+            <div class="accordion-section border-l-4 border-l-blue-500">
+                <div class="accordion-header" onclick="toggleAccordion('personal')">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="user" class="text-blue-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Personal Daily Log</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-blue-500" id="totalPersonalDisplay">₹0</span>
+                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="personal-chevron"></i>
+                    </div>
+                </div>
+                <div class="accordion-content" id="personal-content">
+                    <div class="text-xs text-slate-400 mb-2">Sum deducted from Current Balance as one total.</div>
+
+                    <!-- Toggle Add Form Button -->
+                    <div class="flex justify-end mb-2">
+                        <button onclick="toggleAddForm('personal')" class="btn-toggle-form bg-blue-500 hover:bg-blue-600 text-white" id="personal-toggle-btn" title="Add Personal Expense">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Add Personal Form (Hidden by default) -->
+                    <div class="add-form-container" id="personal-form">
+                        <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div class="grid grid-cols-2 md:flex gap-2">
+                                <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark col-span-2 md:flex-grow">
+                                <select id="newPersAccount" class="input-dark col-span-1 md:w-32">
+                                    <option value="">Account...</option>
+                                </select>
+                                <input type="date" id="newPersDate" class="input-dark col-span-1 md:w-32">
+                                <input type="number" id="newPersAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
+                                <button onclick="addPersonal()" class="btn-add bg-blue-500 hover:bg-blue-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="personalListWrapper" class="w-full">
+                        <div id="personalList" class="max-h-44 md:max-h-64 overflow-y-auto space-y-2 pr-1">
+                            <!-- Items -->
                         </div>
                     </div>
                 </div>
-                <div id="noPaidExpenses" class="hidden text-center text-slate-500 py-8">
-                    No expenses made yet.
-                </div>
             </div>
+
         </div>
 
-        <!-- RIGHT: Personal & Pending -->
-        <div class="space-y-6">
+        <!-- RIGHT Column -->
+        <div class="space-y-4">
 
-             <!-- Income & Opening Settings -->
-             <div class="card border-l-4 border-l-teal-500">
-                <h3 class="text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Income</h3>
-                <div class="space-y-3">
-                    <div>
-                        <label class="text-xs text-slate-500">Opening Balances</label>
-                        <div id="openingBalancesContainer" class="space-y-1 mt-1">
-                            <!-- Opening balances per account will be injected here -->
+            <!-- Income Accordion -->
+            <div class="accordion-section border-l-4 border-l-teal-500">
+                <div class="accordion-header" onclick="toggleAccordion('income')">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="trending-up" class="text-teal-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Income</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-teal-500" id="totalIncomeDisplay">₹0</span>
+                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="income-chevron"></i>
+                    </div>
+                </div>
+                <div class="accordion-content" id="income-content">
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-xs text-slate-500">Income Sources</label>
+                                <button onclick="toggleAddForm('income')" class="btn-toggle-form bg-teal-500 hover:bg-teal-600 text-white" id="income-toggle-btn" title="Add Income">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+
+                            <!-- Add Income Form (Hidden by default) -->
+                            <div class="add-form-container" id="income-form">
+                                <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800 mb-2">
+                                    <div class="grid grid-cols-2 md:flex gap-2">
+                                        <input type="text" id="newIncomeSource" placeholder="Source" class="input-dark col-span-2 md:flex-grow">
+                                        <select id="newIncomeAccount" class="input-dark col-span-1 md:w-32">
+                                            <option value="">Account...</option>
+                                        </select>
+                                        <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
+                                        <button onclick="addIncome()" class="btn-add bg-teal-500 hover:bg-teal-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-xs text-slate-500">Opening Balances</label>
+                                <div id="openingBalancesContainer" class="space-y-1 mt-1">
+                                    <!-- Opening balances per account will be injected here -->
+                                </div>
+                            </div>
+
+                            <div id="incomeList" class="space-y-2 max-h-44 md:max-h-64 overflow-y-auto">Income List</div>
                         </div>
                     </div>
-                    <div>
-                        <label class="text-xs text-slate-500">Income Sources</label>
-                        <div id="incomeList" class="space-y-2"></div>
-                        <div class="grid grid-cols-2 md:flex gap-2 mt-2">
-                            <input type="text" id="newIncomeSource" placeholder="Source" class="input-dark col-span-2 md:flex-grow">
-                            <select id="newIncomeAccount" class="input-dark col-span-1 md:w-32">
-                                <option value="">Account...</option>
-                            </select>
-                            <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
-                            <button onclick="addIncome()" class="btn-add bg-emerald-500 hover:bg-emerald-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                </div>
+            </div>
+
+            <!-- Pending / Budget Accordion -->
+            <div class="accordion-section border-l-4 border-l-orange-500">
+                <div class="accordion-header" onclick="toggleAccordion('pending')">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="clock" class="text-orange-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Pending / Budget</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-orange-500" id="totalPendingDisplay">₹0</span>
+                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="pending-chevron"></i>
+                    </div>
+                </div>
+                <div class="accordion-content" id="pending-content">
+                    <!-- Toggle Add Form Button -->
+                    <div class="flex justify-end mb-2">
+                        <button onclick="toggleAddForm('pending')" class="btn-toggle-form bg-orange-500 hover:bg-orange-600 text-white" id="pending-toggle-btn" title="Add Pending Item">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Add Pending Form (Hidden by default) -->
+                    <div class="add-form-container" id="pending-form">
+                        <div class="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                            <div class="grid grid-cols-2 md:grid-cols-12 gap-2">
+                                <input type="text" id="newPendReason" placeholder="Reason" class="input-dark col-span-2 md:col-span-5">
+                                <div class="col-span-2 md:col-span-3 flex gap-1">
+                                    <select id="newPendCat" class="input-dark w-full">
+                                        <option value="">Loading...</option>
+                                    </select>
+                                    <button onclick="addNewCategory()" class="btn-add bg-orange-500 hover:bg-orange-600 text-white" title="Add Category">+</button>
+                                </div>
+                                <input type="number" id="newPendAmount" placeholder="₹" class="input-dark col-span-4 md:col-span-3">
+                                <button onclick="addPending()" class="btn-add bg-orange-500 hover:bg-orange-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2" id="pendingListWrapper">
+                        <div id="pendingList" class="max-h-44 md:max-h-64 overflow-y-auto space-y-3 pr-1">
+                            <!-- Items will be dynamically added here with serial numbers -->
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Personal Daily Log -->
-            <div class="card border-l-4 border-l-blue-500">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold">Personal Daily Log</h2>
-                    <span class="text-blue-400 font-bold" id="totalPersonalDisplay">₹0</span>
-                </div>
-                <div class="text-xs text-slate-400 mb-2">Sum deducted from Current Balance as one total.</div>
-
-                <div class="grid grid-cols-2 md:flex gap-2 mb-3">
-                    <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark col-span-2 md:flex-grow">
-                    <select id="newPersAccount" class="input-dark col-span-1 md:w-32">
-                        <option value="">Account...</option>
-                    </select>
-                    <input type="date" id="newPersDate" class="input-dark col-span-1 md:w-32">
-                    <input type="number" id="newPersAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
-                    <button onclick="addPersonal()" class="btn-add bg-blue-500 hover:bg-blue-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                </div>
-
-                <div id="personalListWrapper" class="w-full">
-                    <div id="personalList" class="max-h-44 md:max-h-64 overflow-y-auto space-y-2 pr-1">
-                        <!-- Items -->
+            <!-- Long Pending Payments Accordion -->
+            <div class="accordion-section border-l-4 border-l-purple-500">
+                <div class="accordion-header" onclick="toggleAccordion('longPending')">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="hourglass" class="text-purple-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Long Pending</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-purple-500" id="totalLongPendingDisplay">₹0</span>
+                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="longPending-chevron"></i>
                     </div>
                 </div>
-            </div>
-
-            <!-- Pending / Budget -->
-            <div class="card border-l-4 border-l-orange-500">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold">Pending / Budget</h2>
-                    <span class="text-orange-400 font-bold" id="totalPendingDisplay">₹0</span>
-                </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-12 gap-2 mb-3">
-                    <input type="text" id="newPendReason" placeholder="Reason" class="input-dark col-span-2 md:col-span-5">
-                    <div class="col-span-2 md:col-span-3 flex gap-1">
-                        <select id="newPendCat" class="input-dark w-full">
-                            <option value="">Loading...</option>
-                        </select>
-                        <button onclick="addNewCategory()" class="btn-add bg-orange-500 hover:bg-orange-600 text-white" title="Add Category">+</button>
+                <div class="accordion-content" id="longPending-content">
+                    <!-- Toggle Add Form Button -->
+                    <div class="flex justify-end mb-2">
+                        <button onclick="toggleAddForm('longPending')" class="btn-toggle-form bg-purple-500 hover:bg-purple-600 text-white" id="longPending-toggle-btn" title="Add Long Pending Item">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </button>
                     </div>
-                    <!-- <input type="date" id="newPendDate" class="input-dark col-span-2"> -->
-                    <input type="number" id="newPendAmount" placeholder="₹" class="input-dark col-span-4 md:col-span-3">
-                    <button onclick="addPending()" class="btn-add bg-orange-500 hover:bg-orange-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                </div>
 
-                <div class="space-y-2" id="pendingListWrapper">
-                    <div id="pendingList" class="max-h-44 md:max-h-64 overflow-y-auto space-y-3 pr-1">
-                        <!-- Items will be dynamically added here with serial numbers -->
+                    <!-- Add Long Pending Form (Hidden by default) -->
+                    <div class="add-form-container" id="longPending-form">
+                        <div class="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                            <div class="grid grid-cols-2 md:flex gap-2">
+                                <input type="text" id="newLPReason" placeholder="Item (e.g. Loan)" class="input-dark col-span-2 md:flex-grow">
+                                <input type="number" id="newLPAmount" placeholder="Total ₹" class="input-dark col-span-1 md:w-24">
+                                <button onclick="addLongPending()" class="btn-add bg-purple-500 hover:bg-purple-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- Long Pending Payments -->
-            <div class="card border-l-4 border-l-purple-500">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold">Long Pending</h2>
-                    <span class="text-purple-400 font-bold" id="totalLongPendingDisplay">₹0</span>
-                </div>
-
-                <div class="grid grid-cols-2 md:flex gap-2 mb-3">
-                    <input type="text" id="newLPReason" placeholder="Item (e.g. Loan)" class="input-dark col-span-2 md:flex-grow">
-                    <input type="number" id="newLPAmount" placeholder="Total ₹" class="input-dark col-span-1 md:w-24">
-                    <button onclick="addLongPending()" class="btn-add bg-purple-500 hover:bg-purple-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                </div>
-
-                <div id="longPendingListWrapper" class="max-h-44 md:max-h-64 overflow-y-auto space-y-3 pr-1">
-                    <div class="space-y-3" id="longPendingList">
-                        <!-- Items -->
+                    <div id="longPendingListWrapper" class="max-h-44 md:max-h-64 overflow-y-auto space-y-3 pr-1">
+                        <div class="space-y-3" id="longPendingList">
+                            <!-- Items -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -518,6 +682,37 @@
         </div>
     </div>
 
+    <!-- Long Pending Payment Modal -->
+    <div id="payLongPendingModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="card w-96 max-w-full m-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-purple-500">Pay Long Pending</h2>
+                <button onclick="closePayLongPendingModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <p class="mb-4 text-slate-400" id="payLongPendingDesc"></p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Payment Amount</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                        <input type="number" id="payLongPendingAmount" class="input-dark w-full pl-8" placeholder="Enter amount">
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">Max: ₹<span id="payLongPendingMax">0</span></p>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Select Account</label>
+                    <select id="payLongPendingAccount" class="input-dark w-full">
+                        <!-- Options -->
+                    </select>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="closePayLongPendingModal()" class="w-full py-2 bg-slate-700 rounded hover:bg-slate-600">Cancel</button>
+                    <button onclick="confirmPayLongPending()" class="w-full py-2 bg-purple-600 rounded hover:bg-purple-500">Pay Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>
         let currentData = {};
@@ -526,6 +721,7 @@
         let expenseChart = null;
         let pdfChart = null;
         let pendingItemToPay = null;
+        let longPendingItemToPay = null;
 
         $(document).ready(function() {
             lucide.createIcons();
@@ -533,6 +729,7 @@
             loadCategories(); // Load categories
             loadAccounts(); // Load accounts
             initTheme();
+            initAccordions();
 
             $('#monthSelect').change(function() {
                 loadMonthData($(this).val());
@@ -542,6 +739,50 @@
 
             loadLongPending();
         });
+
+        // --- Accordion Functions ---
+        function initAccordions() {
+            // Expand all accordions by default
+            const accordions = ['paidExpenses', 'income', 'personal', 'pending', 'longPending'];
+            accordions.forEach(id => {
+                const content = document.getElementById(`${id}-content`);
+                const chevron = document.getElementById(`${id}-chevron`);
+                if (content) {
+                    content.classList.add('expanded');
+                }
+                if (chevron) {
+                    chevron.classList.add('rotated');
+                }
+            });
+            lucide.createIcons();
+        }
+
+        function toggleAccordion(id) {
+            const content = document.getElementById(`${id}-content`);
+            const chevron = document.getElementById(`${id}-chevron`);
+
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                chevron.classList.remove('rotated');
+            } else {
+                content.classList.add('expanded');
+                chevron.classList.add('rotated');
+            }
+        }
+
+        function toggleAddForm(formId) {
+            const form = document.getElementById(`${formId}-form`);
+            const btn = document.getElementById(`${formId}-toggle-btn`);
+
+            if (form.classList.contains('visible')) {
+                form.classList.remove('visible');
+                btn.classList.remove('active');
+            } else {
+                form.classList.add('visible');
+                btn.classList.add('active');
+            }
+            lucide.createIcons();
+        }
 
         // --- Theme ---
         function initTheme() {
@@ -772,14 +1013,15 @@
             });
 
             // Render Income List
-            const incomeHtml = (currentData.income || []).map(item => `
-                <div class="flex justify-between items-center text-base p-2 bg-slate-100 dark:bg-slate-800/50 rounded group">
+            let incomeHtml = "<label class=\"text-xs text-slate-500\">Income List</label>";
+            incomeHtml += (currentData.income || []).map(item => `
+                <div class="flex justify-between items-center text-base p-2 bg-teal-50 dark:bg-teal-900/20 rounded group">
                     <div>
                         <span>${item.source}</span>
-                        <span class="text-sm text-slate-500 ml-2 bg-slate-200 dark:bg-slate-700 px-1 rounded">${item.account || 'Cash'}</span>
+                        <span class="text-sm text-teal-600 dark:text-teal-400 ml-2 bg-teal-100 dark:bg-teal-800/50 px-1 rounded">${item.account || 'Cash'}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-mono text-green-600 dark:text-green-400">₹${item.amount.toLocaleString()}</span>
+                        <span class="font-mono text-teal-600 dark:text-teal-400">₹${item.amount.toLocaleString()}</span>
                         <button onclick="deleteItem('income', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
                     </div>
                 </div>
@@ -858,6 +1100,7 @@
             $('#totalPersonalDisplay').text('₹' + totalPersonal.toLocaleString());
             $('#totalPaidDisplay').text('₹' + totalPaid.toLocaleString());
             $('#totalPendingDisplay').text('₹' + totalPending.toLocaleString());
+            $('#totalIncomeDisplay').text('₹' + (totalOpening + totalIncome).toLocaleString());
 
             renderCharts(); // Render Charts
 
@@ -922,13 +1165,13 @@
             persArr.forEach((item, idx) => {
                 const sn = idx + 1;
                 persHtml += `
-                <div class="flex justify-between items-center text-base p-2 bg-slate-100 dark:bg-slate-800/50 rounded group">
+                <div class="flex justify-between items-center text-base p-2 bg-blue-50 dark:bg-blue-900/20 rounded group">
                     <div class="flex items-start gap-3">
-                        <div class="text-slate-500 font-mono w-6">${sn}.</div>
+                        <div class="text-blue-500 font-mono w-6">${sn}.</div>
                         <div>
                             <span>${item.reason}</span>
-                            <div class="text-sm text-slate-500 dark:text-slate-400">${item.date || ''}</div>
-                            <div class="text-sm text-slate-500">${item.account || 'Cash'}</div>
+                            <div class="text-sm text-blue-500 dark:text-blue-400">${item.date || ''}</div>
+                            <div class="text-sm text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 px-1 rounded inline-block">${item.account || 'Cash'}</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
@@ -946,16 +1189,16 @@
             pendArr.forEach((item, idx) => {
                 const sn = idx + 1;
                 pendHtml += `
-                <div class="flex justify-between items-center p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm group">
+                <div class="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded shadow-sm group">
                     <div>
-                        <div class="font-medium"><span class="text-slate-500 font-mono w-6 inline-block">${sn}.</span> ${item.reason}</div>
-                        <div class="text-sm text-slate-500 dark:text-slate-400">${item.date || ''}</div>
-                        <div class="text-sm text-orange-500 dark:text-orange-400">${item.category}</div>
+                        <div class="font-medium"><span class="text-orange-500 font-mono w-6 inline-block">${sn}.</span> ${item.reason}</div>
+                        <div class="text-sm text-orange-500 dark:text-orange-400">${item.date || ''}</div>
+                        <div class="text-sm text-orange-600 dark:text-orange-300">${item.category}</div>
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="text-right">
-                            <div class="font-bold">₹${item.amount}</div>
-                            <div class="text-sm text-slate-500">${item.mode || 'Online'}</div>
+                            <div class="font-bold text-orange-600 dark:text-orange-400">₹${item.amount}</div>
+                            <div class="text-sm text-orange-500">${item.mode || 'Online'}</div>
                         </div>
                         <button onclick="payItem('${item.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded" title="Mark Paid">
                             <i data-lucide="check" class="w-4 h-4"></i>
@@ -1520,25 +1763,25 @@
                     const percent = Math.min(100, (item.paidAmount / item.totalAmount) * 100);
 
                     list.append(`
-                        <div class="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm group">
+                        <div class="p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded shadow-sm group">
                             <div class="flex justify-between items-start mb-2">
                                 <div>
-                                    <div class="font-medium"><span class="text-slate-500 font-mono w-6 inline-block">${lpIndex}.</span> ${item.reason}</div>
-                                    <div class="text-xs text-slate-500 dark:text-slate-400">Total: ₹${item.totalAmount.toLocaleString()}</div>
+                                    <div class="font-medium"><span class="text-purple-500 font-mono w-6 inline-block">${lpIndex}.</span> ${item.reason}</div>
+                                    <div class="text-xs text-purple-500 dark:text-purple-400">Total: ₹${item.totalAmount.toLocaleString()}</div>
                                 </div>
                                 <div class="text-right">
                                     <div class="font-bold text-purple-600 dark:text-purple-400">₹${item.remainingAmount.toLocaleString()}</div>
-                                    <div class="text-xs text-slate-500">Remaining</div>
+                                    <div class="text-xs text-purple-500">Remaining</div>
                                 </div>
                             </div>
 
                             <!-- Progress Bar -->
-                            <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mb-3">
+                            <div class="w-full bg-purple-200 dark:bg-purple-800 rounded-full h-1.5 mb-3">
                                 <div class="bg-purple-500 h-1.5 rounded-full" style="width: ${percent}%"></div>
                             </div>
 
                             <div class="flex justify-end gap-2">
-                                <button onclick="payLongPending(${item.id}, '${item.reason}', ${item.remainingAmount})" class="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded flex items-center gap-1">
+                                <button onclick="payLongPending(${item.id}, '${item.reason}', ${item.remainingAmount})" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded flex items-center gap-1">
                                     <i data-lucide="banknote" class="w-3 h-3"></i> Pay
                                 </button>
                                 <button onclick="deleteLongPending('${item.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 p-1">
@@ -1595,31 +1838,66 @@
                 return;
             }
 
-            const amountStr = prompt(`Enter payment amount for "${name}" (Max: ₹${maxAmount}) in ${currentMonthId}:`);
-            if (!amountStr) return;
+            longPendingItemToPay = {
+                id: id,
+                name: name,
+                maxAmount: maxAmount
+            };
 
-            const amount = parseFloat(amountStr);
+            $('#payLongPendingDesc').text(`Paying: ${name} for ${currentMonthId}`);
+            $('#payLongPendingMax').text(maxAmount.toLocaleString());
+            $('#payLongPendingAmount').val('').attr('max', maxAmount);
+
+            // Populate accounts
+            const options = accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+            $('#payLongPendingAccount').html(options);
+
+            // Try to select 'Bank' or 'Cash' as default if available
+            if (accounts.includes('Bank')) $('#payLongPendingAccount').val('Bank');
+            else if (accounts.includes('Cash')) $('#payLongPendingAccount').val('Cash');
+
+            $('#payLongPendingModal').removeClass('hidden').addClass('flex');
+            lucide.createIcons();
+        }
+
+        function closePayLongPendingModal() {
+            $('#payLongPendingModal').addClass('hidden').removeClass('flex');
+            longPendingItemToPay = null;
+        }
+
+        function confirmPayLongPending() {
+            if (!longPendingItemToPay) return;
+
+            const amount = parseFloat($('#payLongPendingAmount').val());
+            const account = $('#payLongPendingAccount').val();
+
             if (isNaN(amount) || amount <= 0) {
-                alert("Invalid amount");
+                alert("Please enter a valid amount");
                 return;
             }
-            if (amount > maxAmount) {
+            if (amount > longPendingItemToPay.maxAmount) {
                 alert("Amount exceeds remaining balance.");
+                return;
+            }
+            if (!account) {
+                alert("Please select an account");
                 return;
             }
 
             $.ajax({
-                url: `/api/long_pending/${id}/partial_payment`,
+                url: `/api/long_pending/${longPendingItemToPay.id}/partial_payment`,
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
                     amount: amount,
                     month_id: currentMonthId,
-                    mode: 'Online'
+                    mode: 'Online',
+                    account: account
                 }),
                 success: function() {
+                    closePayLongPendingModal();
                     loadLongPending();
-                    loadMonthData(currentMonthId); // Refresh month to show new expense
+                    loadMonthData(currentMonthId);
                 },
                 error: function(err) {
                     alert(err.responseJSON.message || "Error recording payment");
@@ -1642,6 +1920,7 @@
             $('#newPaidAccount').html(options);
             $('#newIncomeAccount').html(options);
             $('#newPersAccount').html(options);
+            $('#payLongPendingAccount').html(options);
         }
 
         function renderAccountsList() {
