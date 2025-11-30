@@ -127,6 +127,35 @@
             color: #64748b;
         }
 
+        /* Date input placeholder for mobile */
+        .date-input:not(:focus):not(.has-value)::-webkit-datetime-edit {
+            color: transparent;
+        }
+        .date-input:not(:focus):not(.has-value)::-webkit-datetime-edit-fields-wrapper {
+            color: transparent;
+        }
+        .date-placeholder {
+            position: absolute;
+            left: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            pointer-events: none;
+            font-size: 0.875rem;
+        }
+        .date-input:focus + .date-placeholder,
+        .date-input.has-value + .date-placeholder {
+            display: none;
+        }
+        @media (min-width: 768px) {
+            .date-placeholder {
+                display: none;
+            }
+            .date-input::-webkit-datetime-edit {
+                color: inherit;
+            }
+        }
+
         /* Accordion Styles */
         .accordion-section {
             background-color: var(--card-bg);
@@ -180,16 +209,39 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
             transition: all 0.2s ease;
+            font-size: 0.75rem;
+            font-weight: 500;
         }
         .btn-toggle-form i {
             transition: transform 0.2s ease;
+            width: 14px;
+            height: 14px;
         }
         .btn-toggle-form.active i {
             transform: rotate(45deg);
+        }
+        /* Mobile accordion for chart */
+        @media (max-width: 1023px) {
+            .mobile-chart-accordion .accordion-content {
+                max-height: 0;
+                overflow: hidden;
+            }
+            .mobile-chart-accordion .accordion-content.expanded {
+                max-height: 500px;
+            }
+        }
+        @media (min-width: 1024px) {
+            .mobile-chart-accordion .accordion-content {
+                max-height: none !important;
+                padding: 0 1rem 1rem 1rem !important;
+            }
+            .mobile-chart-accordion .accordion-header {
+                display: none;
+            }
         }
 
     </style>
@@ -197,40 +249,80 @@
 <body class="p-4 md:p-6 pb-20">
 
     <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <div class="flex items-center gap-2">
-            <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
-            <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
+    <div class="mb-6">
+        <!-- Top Row: Logo & Quick Actions -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-2">
+                <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
+                <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
+            </div>
+
+            <!-- Desktop Actions (hidden on mobile) -->
+            <div class="hidden md:flex gap-2 items-center">
+                <select id="monthSelect" class="input-dark w-40 h-10">
+                    <option value="">Loading...</option>
+                </select>
+
+                <button onclick="showCreateModal()" class="btn-brand flex items-center gap-2 px-4 py-2 h-10 transition-colors" title="Create a new month">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span class="font-medium">New Month</span>
+                </button>
+
+                <button onclick="showAccountsModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Manage Accounts">
+                    <i data-lucide="credit-card" class="w-4 h-4"></i>
+                    <span class="font-medium">Accounts</span>
+                </button>
+
+                <button onclick="exportPDF()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Download PDF Report">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span class="font-medium">Export</span>
+                </button>
+
+                <button id="theme-toggle" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded h-10 transition-colors" title="Toggle Theme">
+                    <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
+                </button>
+
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Logout">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span class="font-medium">Logout</span>
+                </a>
+            </div>
+
+            <!-- Mobile Quick Actions (Theme & Logout only) -->
+            <div class="flex md:hidden gap-2 items-center">
+                <button id="theme-toggle-mobile" class="bg-slate-600 hover:bg-slate-700 text-white p-2.5 rounded transition-colors" title="Toggle Theme">
+                    <i id="theme-icon-mobile" data-lucide="sun" class="w-5 h-5"></i>
+                </button>
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white p-2.5 rounded transition-colors" title="Logout">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </a>
+            </div>
         </div>
 
-        <div class="flex flex-wrap gap-2 items-center justify-center md:justify-end">
-            <select id="monthSelect" class="input-dark w-32 md:w-40 h-10">
-                <option value="">Loading...</option>
-            </select>
+        <!-- Mobile Controls Row (visible only on mobile) -->
+        <div class="md:hidden space-y-3">
+            <!-- Month Selector Row -->
+            <div class="flex gap-2">
+                <select id="monthSelectMobile" class="input-dark flex-1 h-11 text-base">
+                    <option value="">Loading...</option>
+                </select>
+                <button onclick="showCreateModal()" class="btn-brand flex items-center justify-center gap-2 px-4 h-11 transition-colors" title="New Month">
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                    <span class="font-medium">New</span>
+                </button>
+            </div>
 
-            <button onclick="showCreateModal()" class="btn-brand flex items-center gap-2 px-4 py-2 h-10 transition-colors" title="Create a new month">
-                <i data-lucide="plus" class="w-4 h-4"></i>
-                <span class="hidden sm:inline font-medium">New Month</span>
-            </button>
-
-            <button onclick="showAccountsModal()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Manage Accounts">
-                <i data-lucide="credit-card" class="w-4 h-4"></i>
-                <span class="hidden sm:inline font-medium">Accounts</span>
-            </button>
-
-            <button onclick="exportPDF()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Download PDF Report">
-                <i data-lucide="download" class="w-4 h-4"></i>
-                <span class="hidden sm:inline font-medium">Export</span>
-            </button>
-
-            <button id="theme-toggle" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded h-10 transition-colors" title="Toggle Theme">
-                <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
-            </button>
-
-            <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Logout">
-                <i data-lucide="log-out" class="w-4 h-4"></i>
-                <span class="hidden sm:inline font-medium">Logout</span>
-            </a>
+            <!-- Action Buttons Row -->
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="showAccountsModal()" class="bg-slate-700 hover:bg-slate-600 text-white py-2.5 px-4 rounded flex items-center justify-center gap-2 transition-colors" title="Manage Accounts">
+                    <i data-lucide="credit-card" class="w-5 h-5"></i>
+                    <span class="font-medium">Accounts</span>
+                </button>
+                <button onclick="exportPDF()" class="bg-slate-600 hover:bg-slate-700 text-white py-2.5 px-4 rounded flex items-center justify-center gap-2 transition-colors" title="Export PDF">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                    <span class="font-medium">Export PDF</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -240,15 +332,88 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6" id="statsContainer">
-        <!-- Injected via JS -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Balance Card -->
+        <div id="statsContainer">
+            <!-- Injected via JS -->
+        </div>
+
+        <!-- Chart Card (Mobile Accordion) -->
+        <div class="accordion-section mobile-chart-accordion border-l-4 border-l-purple-500 lg:border-l-0">
+            <div class="accordion-header lg:hidden" onclick="toggleAccordion('expenseChart')">
+                <div class="flex items-center gap-3">
+                    <i data-lucide="pie-chart" class="text-purple-500 w-5 h-5"></i>
+                    <h2 class="text-lg font-semibold">Expense Analysis</h2>
+                </div>
+                <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="expenseChart-chevron"></i>
+            </div>
+            <div class="accordion-content" id="expenseChart-content">
+                <div class="text-purple-500 text-sm uppercase font-bold mb-2 hidden lg:block">Expense Analysis</div>
+                <div class="relative w-full min-h-[200px]">
+                    <canvas id="expenseChart"></canvas>
+                    <div id="expenseChartNoData" class="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm hidden">
+                        No data available yet to render the chart!
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Main Content Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <!-- LEFT Column -->
+        <!-- LEFT Column: Income, Paid Expenses, Daily Expenses -->
         <div class="space-y-4">
+
+            <!-- Income Accordion -->
+            <div class="accordion-section border-l-4 border-l-teal-500">
+                <div class="accordion-header" onclick="toggleAccordion('income')">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="trending-up" class="text-teal-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Income</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-teal-500" id="totalIncomeDisplay">₹0</span>
+                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="income-chevron"></i>
+                    </div>
+                </div>
+                <div class="accordion-content" id="income-content">
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-xs text-slate-500">Income Sources</label>
+                                <button onclick="toggleAddForm('income')" class="btn-toggle-form bg-teal-500 hover:bg-teal-600 text-white" id="income-toggle-btn" title="Add Income">
+                                    <i data-lucide="plus"></i>
+                                    <span>Add Income</span>
+                                </button>
+                            </div>
+
+                            <!-- Add Income Form (Hidden by default) -->
+                            <div class="add-form-container" id="income-form">
+                                <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800 mb-2">
+                                    <div class="grid grid-cols-2 md:flex gap-2">
+                                        <input type="text" id="newIncomeSource" placeholder="Source" class="input-dark col-span-2 md:flex-grow">
+                                        <select id="newIncomeAccount" class="input-dark col-span-1 md:w-32">
+                                            <option value="">Account...</option>
+                                        </select>
+                                        <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
+                                        <button onclick="addIncome()" class="btn-add bg-teal-500 hover:bg-teal-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-xs text-slate-500">Opening Balances</label>
+                                <div id="openingBalancesContainer" class="space-y-1 mt-1">
+                                    <!-- Opening balances per account will be injected here -->
+                                </div>
+                            </div>
+
+                            <div id="incomeList" class="space-y-2 max-h-44 md:max-h-64 overflow-y-auto mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Paid Expenses Accordion -->
             <div class="accordion-section border-l-4 border-l-rose-500">
@@ -266,7 +431,8 @@
                     <!-- Toggle Add Form Button -->
                     <div class="flex justify-end mb-2">
                         <button onclick="toggleAddForm('paid')" class="btn-toggle-form bg-rose-500 hover:bg-rose-600 text-white" id="paid-toggle-btn" title="Add New Expense">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <i data-lucide="plus"></i>
+                            <span>Add Expense</span>
                         </button>
                     </div>
 
@@ -284,7 +450,10 @@
                                 <select id="newPaidAccount" class="input-dark col-span-1 md:col-span-2">
                                     <option value="">Account...</option>
                                 </select>
-                                <input type="date" id="newPaidDate" class="input-dark col-span-1 md:col-span-2">
+                                <div class="col-span-1 md:col-span-2 relative">
+                                    <input type="date" id="newPaidDate" class="input-dark w-full date-input">
+                                    <span class="date-placeholder md:hidden">Date</span>
+                                </div>
                                 <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
                                 <button onclick="addPaid()" class="btn-add bg-rose-500 hover:bg-rose-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
@@ -322,12 +491,12 @@
                 </div>
             </div>
 
-            <!-- Personal Daily Log Accordion -->
+            <!-- Daily Expenses Accordion (renamed from Personal Daily Log) -->
             <div class="accordion-section border-l-4 border-l-blue-500">
                 <div class="accordion-header" onclick="toggleAccordion('personal')">
                     <div class="flex items-center gap-3">
-                        <i data-lucide="user" class="text-blue-500 w-5 h-5"></i>
-                        <h2 class="text-lg font-semibold">Personal Daily Log</h2>
+                        <i data-lucide="coffee" class="text-blue-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Daily Expenses</h2>
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="text-sm font-bold text-blue-500" id="totalPersonalDisplay">₹0</span>
@@ -339,8 +508,9 @@
 
                     <!-- Toggle Add Form Button -->
                     <div class="flex justify-end mb-2">
-                        <button onclick="toggleAddForm('personal')" class="btn-toggle-form bg-blue-500 hover:bg-blue-600 text-white" id="personal-toggle-btn" title="Add Personal Expense">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        <button onclick="toggleAddForm('personal')" class="btn-toggle-form bg-blue-500 hover:bg-blue-600 text-white" id="personal-toggle-btn" title="Add Daily Expense">
+                            <i data-lucide="plus"></i>
+                            <span>Add Daily Expense</span>
                         </button>
                     </div>
 
@@ -352,7 +522,10 @@
                                 <select id="newPersAccount" class="input-dark col-span-1 md:w-32">
                                     <option value="">Account...</option>
                                 </select>
-                                <input type="date" id="newPersDate" class="input-dark col-span-1 md:w-32">
+                                <div class="col-span-1 md:w-32 relative">
+                                    <input type="date" id="newPersDate" class="input-dark w-full date-input">
+                                    <span class="date-placeholder md:hidden">Date</span>
+                                </div>
                                 <input type="number" id="newPersAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
                                 <button onclick="addPersonal()" class="btn-add bg-blue-500 hover:bg-blue-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
@@ -369,57 +542,8 @@
 
         </div>
 
-        <!-- RIGHT Column -->
+        <!-- RIGHT Column: Pending/Budget, Long Pending, Notes -->
         <div class="space-y-4">
-
-            <!-- Income Accordion -->
-            <div class="accordion-section border-l-4 border-l-teal-500">
-                <div class="accordion-header" onclick="toggleAccordion('income')">
-                    <div class="flex items-center gap-3">
-                        <i data-lucide="trending-up" class="text-teal-500 w-5 h-5"></i>
-                        <h2 class="text-lg font-semibold">Income</h2>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm font-bold text-teal-500" id="totalIncomeDisplay">₹0</span>
-                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="income-chevron"></i>
-                    </div>
-                </div>
-                <div class="accordion-content" id="income-content">
-                    <div class="space-y-3">
-                        <div>
-                            <div class="flex justify-between items-center mb-2">
-                                <label class="text-xs text-slate-500">Income Sources</label>
-                                <button onclick="toggleAddForm('income')" class="btn-toggle-form bg-teal-500 hover:bg-teal-600 text-white" id="income-toggle-btn" title="Add Income">
-                                    <i data-lucide="plus" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-
-                            <!-- Add Income Form (Hidden by default) -->
-                            <div class="add-form-container" id="income-form">
-                                <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800 mb-2">
-                                    <div class="grid grid-cols-2 md:flex gap-2">
-                                        <input type="text" id="newIncomeSource" placeholder="Source" class="input-dark col-span-2 md:flex-grow">
-                                        <select id="newIncomeAccount" class="input-dark col-span-1 md:w-32">
-                                            <option value="">Account...</option>
-                                        </select>
-                                        <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
-                                        <button onclick="addIncome()" class="btn-add bg-teal-500 hover:bg-teal-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="text-xs text-slate-500">Opening Balances</label>
-                                <div id="openingBalancesContainer" class="space-y-1 mt-1">
-                                    <!-- Opening balances per account will be injected here -->
-                                </div>
-                            </div>
-
-                            <div id="incomeList" class="space-y-2 max-h-44 md:max-h-64 overflow-y-auto">Income List</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Pending / Budget Accordion -->
             <div class="accordion-section border-l-4 border-l-orange-500">
@@ -437,7 +561,8 @@
                     <!-- Toggle Add Form Button -->
                     <div class="flex justify-end mb-2">
                         <button onclick="toggleAddForm('pending')" class="btn-toggle-form bg-orange-500 hover:bg-orange-600 text-white" id="pending-toggle-btn" title="Add Pending Item">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <i data-lucide="plus"></i>
+                            <span>Add Pending</span>
                         </button>
                     </div>
 
@@ -482,7 +607,8 @@
                     <!-- Toggle Add Form Button -->
                     <div class="flex justify-end mb-2">
                         <button onclick="toggleAddForm('longPending')" class="btn-toggle-form bg-purple-500 hover:bg-purple-600 text-white" id="longPending-toggle-btn" title="Add Long Pending Item">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <i data-lucide="plus"></i>
+                            <span>Add Long Pending</span>
                         </button>
                     </div>
 
@@ -500,6 +626,48 @@
                     <div id="longPendingListWrapper" class="max-h-44 md:max-h-64 overflow-y-auto space-y-3 pr-1">
                         <div class="space-y-3" id="longPendingList">
                             <!-- Items -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes Accordion -->
+            <div class="accordion-section border-l-4 border-l-cyan-500">
+                <div class="accordion-header" onclick="toggleAccordion('notes')">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="sticky-note" class="text-cyan-500 w-5 h-5"></i>
+                        <h2 class="text-lg font-semibold">Notes</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold text-cyan-500" id="totalNotesDisplay">0</span>
+                        <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="notes-chevron"></i>
+                    </div>
+                </div>
+                <div class="accordion-content" id="notes-content">
+                    <!-- Toggle Add Form Button -->
+                    <div class="flex justify-end mb-2">
+                        <button onclick="toggleAddForm('notes')" class="btn-toggle-form bg-cyan-500 hover:bg-cyan-600 text-white" id="notes-toggle-btn" title="Add Note">
+                            <i data-lucide="plus"></i>
+                            <span>Add Note</span>
+                        </button>
+                    </div>
+
+                    <!-- Add Note Form (Hidden by default) -->
+                    <div class="add-form-container" id="notes-form">
+                        <div class="p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg border border-cyan-200 dark:border-cyan-800">
+                            <div class="space-y-2">
+                                <input type="text" id="newNoteTitle" placeholder="Note Title" class="input-dark w-full">
+                                <textarea id="newNoteContent" placeholder="Write your note here..." class="input-dark w-full h-24 resize-none"></textarea>
+                                <div class="flex justify-end">
+                                    <button onclick="addNote()" class="btn-add bg-cyan-500 hover:bg-cyan-600 text-white px-4"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="notesListWrapper" class="max-h-64 overflow-y-auto space-y-3 pr-1">
+                        <div class="space-y-3" id="notesList">
+                            <!-- Notes will be dynamically added here -->
                         </div>
                     </div>
                 </div>
@@ -713,6 +881,42 @@
         </div>
     </div>
 
+    <!-- View Note Modal -->
+    <div id="viewNoteModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-slate-800 rounded-lg w-full max-w-lg mx-4 shadow-xl">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-cyan-600 dark:text-cyan-400" id="viewNoteTitle">Note Title</h3>
+                <button onclick="closeViewNoteModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="p-4">
+                <p class="text-xs text-slate-400 mb-3" id="viewNoteDate"></p>
+                <div class="text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-64 overflow-y-auto" id="viewNoteContent"></div>
+            </div>
+            <div class="p-4 border-t border-slate-200 dark:border-slate-700">
+                <button onclick="closeViewNoteModal()" class="w-full py-2 bg-slate-200 dark:bg-slate-700 rounded hover:bg-slate-300 dark:hover:bg-slate-600">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Note Modal -->
+    <div id="editNoteModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-slate-800 rounded-lg w-full max-w-lg mx-4 shadow-xl">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-cyan-600 dark:text-cyan-400">Edit Note</h3>
+                <button onclick="closeEditNoteModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="p-4 space-y-3">
+                <input type="hidden" id="editNoteId">
+                <input type="text" id="editNoteTitle" placeholder="Note Title" class="input-dark w-full">
+                <textarea id="editNoteContent" placeholder="Write your note here..." class="input-dark w-full h-32 resize-none"></textarea>
+            </div>
+            <div class="p-4 border-t border-slate-200 dark:border-slate-700 flex gap-2">
+                <button onclick="closeEditNoteModal()" class="w-full py-2 bg-slate-200 dark:bg-slate-700 rounded hover:bg-slate-300 dark:hover:bg-slate-600">Cancel</button>
+                <button onclick="saveEditedNote()" class="w-full py-2 bg-cyan-600 text-white rounded hover:bg-cyan-500">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>
         let currentData = {};
@@ -731,29 +935,40 @@
             initTheme();
             initAccordions();
 
+            // Desktop month selector
             $('#monthSelect').change(function() {
-                loadMonthData($(this).val());
+                const val = $(this).val();
+                $('#monthSelectMobile').val(val); // Sync mobile
+                loadMonthData(val);
             });
 
+            // Mobile month selector
+            $('#monthSelectMobile').change(function() {
+                const val = $(this).val();
+                $('#monthSelect').val(val); // Sync desktop
+                loadMonthData(val);
+            });
+
+            // Theme toggles (both desktop and mobile)
             $('#theme-toggle').click(toggleTheme);
+            $('#theme-toggle-mobile').click(toggleTheme);
+
+            // Date input placeholder handling for mobile
+            $('.date-input').on('change input', function() {
+                if ($(this).val()) {
+                    $(this).addClass('has-value');
+                } else {
+                    $(this).removeClass('has-value');
+                }
+            });
 
             loadLongPending();
         });
 
         // --- Accordion Functions ---
         function initAccordions() {
-            // Expand all accordions by default
-            const accordions = ['paidExpenses', 'income', 'personal', 'pending', 'longPending'];
-            accordions.forEach(id => {
-                const content = document.getElementById(`${id}-content`);
-                const chevron = document.getElementById(`${id}-chevron`);
-                if (content) {
-                    content.classList.add('expanded');
-                }
-                if (chevron) {
-                    chevron.classList.add('rotated');
-                }
-            });
+            // All accordions are closed by default - user can open as needed
+            // No action needed - accordions start collapsed
             lucide.createIcons();
         }
 
@@ -789,10 +1004,10 @@
             const isDarkMode = localStorage.getItem('theme') === 'dark';
             if (isDarkMode) {
                 $('html').addClass('dark').removeClass('light');
-                $('#theme-icon').attr('data-lucide', 'moon');
+                $('#theme-icon, #theme-icon-mobile').attr('data-lucide', 'moon');
             } else {
                 $('html').addClass('light').removeClass('dark');
-                $('#theme-icon').attr('data-lucide', 'sun');
+                $('#theme-icon, #theme-icon-mobile').attr('data-lucide', 'sun');
             }
             lucide.createIcons();
             if(currentData && currentMonthId) renderCharts(); // Re-render chart on theme change
@@ -804,11 +1019,11 @@
             if (isDarkMode) {
                 html.removeClass('dark').addClass('light');
                 localStorage.setItem('theme', 'light');
-                $('#theme-icon').attr('data-lucide', 'sun');
+                $('#theme-icon, #theme-icon-mobile').attr('data-lucide', 'sun');
             } else {
                 html.removeClass('light').addClass('dark');
                 localStorage.setItem('theme', 'dark');
-                $('#theme-icon').attr('data-lucide', 'moon');
+                $('#theme-icon, #theme-icon-mobile').attr('data-lucide', 'moon');
             }
             lucide.createIcons();
             if(currentData && currentMonthId) renderCharts(); // Re-render chart on theme change
@@ -850,9 +1065,13 @@
         function loadMonths() {
             $.get('/api/months', function(months) {
                 const sel = $('#monthSelect');
+                const selMobile = $('#monthSelectMobile');
                 sel.empty();
+                selMobile.empty();
+
                 if (months.length === 0) {
                     sel.append('<option value="">No Data</option>');
+                    selMobile.append('<option value="">No Data</option>');
                     // Prompt to create or import
                     showCreateModal();
                 } else {
@@ -870,6 +1089,7 @@
                             displayName = date.toLocaleString('default', { month: 'long', year: 'numeric' });
                         }
                         sel.append(`<option value="${m}">${displayName}</option>`);
+                        selMobile.append(`<option value="${m}">${displayName}</option>`);
                     });
                     loadMonthData(months[0]); // Load first
                 }
@@ -1084,17 +1304,6 @@
                         <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹${expectedBalance.toLocaleString()}</div>
                     </div>
                 </div>
-
-                <!-- Chart Card -->
-                <div class="card border-l-4 border-l-purple-500 p-4 flex flex-col">
-                    <div class="text-purple-500 text-sm uppercase font-bold mb-2">Expense Analysis</div>
-                    <div class="flex-grow relative w-full min-h-[200px]">
-                        <canvas id="expenseChart"></canvas>
-                        <div id="expenseChartNoData" class="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm hidden">
-                            No data available yet to render the chart!
-                        </div>
-                    </div>
-                </div>
             `);
 
             $('#totalPersonalDisplay').text('₹' + totalPersonal.toLocaleString());
@@ -1211,6 +1420,9 @@
                 `;
             });
             $('#pendingList').html(pendHtml);
+
+            // Render Notes
+            renderNotes();
 
             lucide.createIcons();
         }
@@ -1965,6 +2177,138 @@
                     alert(err.responseJSON.message || "Error adding account");
                 }
             });
+        }
+
+        // --- Notes Functions ---
+        function renderNotes() {
+            if (!currentData) return;
+
+            // Initialize notes array if not exists
+            if (!currentData.notes) currentData.notes = [];
+
+            const notesList = $('#notesList');
+            notesList.empty();
+
+            const notes = (currentData.notes || []).slice().reverse();
+            let notesHtml = '';
+
+            notes.forEach((note, idx) => {
+                const sn = idx + 1;
+                const date = note.date || '';
+                const truncatedContent = note.content && note.content.length > 100
+                    ? note.content.substring(0, 100) + '...'
+                    : note.content;
+
+                notesHtml += `
+                <div class="p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded shadow-sm group">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex-1">
+                            <div class="font-medium text-cyan-700 dark:text-cyan-300" onclick="viewNote('${note.id}')">
+                                <span class="text-cyan-500 font-mono w-6 inline-block">${sn}.</span>
+                                ${note.title || 'Untitled Note'}
+                            </div>
+
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="text-xs text-cyan-500 dark:text-cyan-400 mt-1">${date}</div>
+                            <button onclick="editNote('${note.id}')" class="text-cyan-500 hover:text-cyan-600 p-1" title="Edit">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteNote('${note.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 p-1" title="Delete">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+
+            if (notes.length === 0) {
+                notesHtml = '<div class="text-center text-slate-400 py-4">No notes yet. Add your first note!</div>';
+            }
+
+            notesList.html(notesHtml);
+            $('#totalNotesDisplay').text(notes.length);
+            lucide.createIcons();
+        }
+
+        function addNote() {
+            const title = $('#newNoteTitle').val().trim();
+            const content = $('#newNoteContent').val().trim();
+
+            if (!title && !content) {
+                alert('Please enter a title or content for the note');
+                return;
+            }
+
+            if (!currentData.notes) currentData.notes = [];
+
+            currentData.notes.push({
+                id: Date.now(),
+                title: title || 'Untitled Note',
+                content: content,
+                date: new Date().toISOString().split('T')[0]
+            });
+
+            $('#newNoteTitle').val('');
+            $('#newNoteContent').val('');
+            saveData();
+            renderNotes();
+        }
+
+        function deleteNote(id) {
+            if (!confirm('Delete this note?')) return;
+
+            currentData.notes = currentData.notes.filter(n => String(n.id) !== String(id));
+            saveData();
+            renderNotes();
+        }
+
+        function editNote(id) {
+            const note = currentData.notes.find(n => String(n.id) === String(id));
+            if (!note) return;
+
+            // Show edit modal
+            $('#editNoteId').val(note.id);
+            $('#editNoteTitle').val(note.title || '');
+            $('#editNoteContent').val(note.content || '');
+            $('#editNoteModal').removeClass('hidden').addClass('flex');
+        }
+
+        function viewNote(id) {
+            const note = currentData.notes.find(n => String(n.id) === String(id));
+            if (!note) return;
+
+            // Show view modal
+            $('#viewNoteTitle').text(note.title || 'Untitled Note');
+            $('#viewNoteDate').text(note.date || '');
+            $('#viewNoteContent').text(note.content || '');
+            $('#viewNoteModal').removeClass('hidden').addClass('flex');
+        }
+
+        function closeViewNoteModal() {
+            $('#viewNoteModal').addClass('hidden').removeClass('flex');
+        }
+
+        function closeEditNoteModal() {
+            $('#editNoteModal').addClass('hidden').removeClass('flex');
+        }
+
+        function saveEditedNote() {
+            const id = $('#editNoteId').val();
+            const title = $('#editNoteTitle').val().trim();
+            const content = $('#editNoteContent').val().trim();
+
+            const note = currentData.notes.find(n => String(n.id) === String(id));
+            if (!note) return;
+
+            note.title = title || 'Untitled Note';
+            note.content = content;
+            note.updatedDate = new Date().toISOString().split('T')[0];
+
+            saveData();
+            renderNotes();
+            closeEditNoteModal();
         }
 
         // --- Modal Functions ---
