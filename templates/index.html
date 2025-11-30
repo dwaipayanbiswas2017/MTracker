@@ -81,6 +81,18 @@
         .btn-brand:hover {
             background-color: var(--brand-hover);
         }
+        .btn-add {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            height: 44px;
+            width: 44px;
+            min-width: 44px;
+            border-radius: 0.375rem;
+            font-weight: 600;
+        }
+        .btn-add i { display: inline-flex; }
         .card {
             background-color: var(--card-bg);
             border-radius: 0.5rem;
@@ -188,32 +200,40 @@
                         <select id="newPaidCat" class="input-dark w-full">
                             <option value="">Cat...</option>
                         </select>
-                        <button onclick="addNewCategory()" class="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded" title="Add Category">+</button>
+                        <button onclick="addNewCategory()" class="btn-add bg-rose-500 hover:bg-rose-600 text-white" title="Add Category">+</button>
                     </div>
                     <select id="newPaidAccount" class="input-dark col-span-1 md:col-span-2">
                         <option value="">Account...</option>
                     </select>
                     <input type="date" id="newPaidDate" class="input-dark col-span-1 md:col-span-2">
                     <input type="number" id="newPaidAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
-                    <button onclick="addPaid()" class="btn-brand col-span-1 md:col-span-1 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <button onclick="addPaid()" class="btn-add bg-rose-500 hover:bg-rose-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
                 <div id="paidTableContainer" class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                            <tr>
-                                <th class="p-2 rounded-l">Reason</th>
-                                <th class="p-2">Account</th>
-                                <th class="p-2">Category</th>
-                                <th class="p-2">Date</th>
-                                <th class="p-2 text-right">Amount</th>
-                                <th class="p-2 rounded-r w-10"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="paidList" class="divide-y divide-slate-200 dark:divide-slate-700">
-                            <!-- Rows -->
-                        </tbody>
-                    </table>
+                    <div class="w-full">
+                        <table class="w-full text-left text-sm border-separate" style="border-spacing:0">
+                            <thead class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                <tr>
+                                    <th class="p-2 w-10 sticky top-0 bg-inherit">#</th>
+                                    <th class="p-2">Reason</th>
+                                    <th class="p-2">Account</th>
+                                    <th class="p-2">Category</th>
+                                    <th class="p-2">Date</th>
+                                    <th class="p-2 text-right">Amount</th>
+                                    <th class="p-2 rounded-r w-10"></th>
+                                </tr>
+                            </thead>
+                        </table>
+
+                        <div id="paidTableScroll" class="overflow-y-auto w-full" style="max-height: 360px;">
+                            <table class="w-full text-left text-sm">
+                                <tbody id="paidList" class="divide-y divide-slate-200 dark:divide-slate-700">
+                                    <!-- Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
                 <div id="noPaidExpenses" class="hidden text-center text-slate-500 py-8">
                     No expenses made yet.
@@ -243,7 +263,7 @@
                                 <option value="">Account...</option>
                             </select>
                             <input type="number" id="newIncomeAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
-                            <button onclick="addIncome()" class="btn-brand col-span-2 md:w-auto flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            <button onclick="addIncome()" class="btn-add bg-emerald-500 hover:bg-emerald-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                         </div>
                     </div>
                 </div>
@@ -264,11 +284,13 @@
                     </select>
                     <input type="date" id="newPersDate" class="input-dark col-span-1 md:w-32">
                     <input type="number" id="newPersAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
-                    <button onclick="addPersonal()" class="btn-brand col-span-1 md:w-auto flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <button onclick="addPersonal()" class="btn-add bg-blue-500 hover:bg-blue-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
-                <div class="max-h-48 overflow-y-auto space-y-2 pr-1" id="personalList">
-                    <!-- Items -->
+                <div id="personalListWrapper" class="w-full">
+                    <div id="personalList" class="max-h-44 md:max-h-64 overflow-y-auto space-y-2 pr-1">
+                        <!-- Items -->
+                    </div>
                 </div>
             </div>
 
@@ -285,15 +307,17 @@
                         <select id="newPendCat" class="input-dark w-full">
                             <option value="">Loading...</option>
                         </select>
-                        <button onclick="addNewCategory()" class="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded" title="Add Category">+</button>
+                        <button onclick="addNewCategory()" class="btn-add bg-orange-500 hover:bg-orange-600 text-white" title="Add Category">+</button>
                     </div>
                     <!-- <input type="date" id="newPendDate" class="input-dark col-span-2"> -->
-                    <input type="number" id="newPendAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
-                    <button onclick="addPending()" class="btn-brand col-span-1 md:col-span-2 flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <input type="number" id="newPendAmount" placeholder="₹" class="input-dark col-span-4 md:col-span-3">
+                    <button onclick="addPending()" class="btn-add bg-orange-500 hover:bg-orange-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
-                <div class="space-y-2" id="pendingList">
-                    <!-- Pending Items -->
+                <div class="space-y-2" id="pendingListWrapper">
+                    <div id="pendingList" class="max-h-44 md:max-h-64 overflow-y-auto space-y-3 pr-1">
+                        <!-- Items will be dynamically added here with serial numbers -->
+                    </div>
                 </div>
             </div>
 
@@ -307,11 +331,13 @@
                 <div class="grid grid-cols-2 md:flex gap-2 mb-3">
                     <input type="text" id="newLPReason" placeholder="Item (e.g. Loan)" class="input-dark col-span-2 md:flex-grow">
                     <input type="number" id="newLPAmount" placeholder="Total ₹" class="input-dark col-span-1 md:w-24">
-                    <button onclick="addLongPending()" class="btn-brand bg-purple-600 hover:bg-purple-700 col-span-1 md:w-auto flex justify-center items-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <button onclick="addLongPending()" class="btn-add bg-purple-500 hover:bg-purple-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </div>
 
-                <div class="space-y-3" id="longPendingList">
-                    <!-- Items -->
+                <div id="longPendingListWrapper" class="max-h-44 md:max-h-64 overflow-y-auto space-y-3 pr-1">
+                    <div class="space-y-3" id="longPendingList">
+                        <!-- Items -->
+                    </div>
                 </div>
             </div>
 
@@ -835,13 +861,16 @@
 
             renderCharts(); // Render Charts
 
-            // Render Paid List
-            let paidHtml = '';
+            // Render Paid List with serial numbers
+            let paidRows = '';
 
-            // Personal Expenses Summary Row
+            // Personal Expenses Summary Row (as first row if present)
+            let rowIndex = 0;
             if (totalPersonal > 0) {
-                paidHtml += `
+                rowIndex++;
+                paidRows += `
                 <tr class="bg-blue-900/20 border-b border-blue-900/30">
+                    <td class="p-2 text-xs font-medium text-slate-600">${rowIndex}</td>
                     <td class="p-2 font-medium text-blue-400">Personal Expenses (Total)</td>
                     <td class="p-2 text-slate-400 text-xs">-</td>
                     <td class="p-2"><span class="bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded text-xs">Personal</span></td>
@@ -851,8 +880,12 @@
                 </tr>`;
             }
 
-            paidHtml += (currentData.paidExpenses || []).slice().reverse().map(item => `
+            const paidListArr = (currentData.paidExpenses || []).slice().reverse();
+            paidListArr.forEach(item => {
+                rowIndex++;
+                paidRows += `
                 <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50 group">
+                    <td class="p-2 text-xs text-slate-600">${rowIndex}</td>
                     <td class="p-2 font-medium">${item.reason}</td>
                     <td class="p-2 text-sm text-slate-500">${item.account || 'Cash'}</td>
                     <td class="p-2"><span class="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-sm">${item.category}</span></td>
@@ -861,38 +894,61 @@
                     <td class="p-2 text-right">
                         <button onclick="deleteItem('paidExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
-                </tr>`).join('');
+                </tr>`;
+            });
 
-            if (paidHtml.trim() === '') {
+            if (rowIndex === 0) {
                 $('#paidTableContainer').addClass('hidden');
                 $('#noPaidExpenses').removeClass('hidden');
             } else {
                 $('#paidTableContainer').removeClass('hidden');
                 $('#noPaidExpenses').addClass('hidden');
-                $('#paidList').html(paidHtml);
+                $('#paidList').html(paidRows);
+
+                // Responsive max-height adjustments for paid list scroll area
+                const paidScroll = $('#paidTableScroll');
+                if (window.innerWidth < 640) { // Mobile: small height
+                    paidScroll.css('max-height', '220px');
+                } else if (window.innerWidth < 1024) { // Tablet
+                    paidScroll.css('max-height', '320px');
+                } else { // Desktop
+                    paidScroll.css('max-height', '420px');
+                }
             }
 
-            // Render Personal List
-            const persHtml = (currentData.personalExpenses || []).slice().reverse().map(item => `
+            // Render Personal List with serial numbers
+            const persArr = (currentData.personalExpenses || []).slice().reverse();
+            let persHtml = '';
+            persArr.forEach((item, idx) => {
+                const sn = idx + 1;
+                persHtml += `
                 <div class="flex justify-between items-center text-base p-2 bg-slate-100 dark:bg-slate-800/50 rounded group">
-                    <div>
-                        <span>${item.reason}</span>
-                        <div class="text-sm text-slate-500 dark:text-slate-400">${item.date || ''}</div>
-                        <div class="text-sm text-slate-500">${item.account || 'Cash'}</div>
+                    <div class="flex items-start gap-3">
+                        <div class="text-slate-500 font-mono w-6">${sn}.</div>
+                        <div>
+                            <span>${item.reason}</span>
+                            <div class="text-sm text-slate-500 dark:text-slate-400">${item.date || ''}</div>
+                            <div class="text-sm text-slate-500">${item.account || 'Cash'}</div>
+                        </div>
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="font-mono text-blue-600 dark:text-blue-300">₹${item.amount}</span>
                         <button onclick="deleteItem('personalExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
                     </div>
                 </div>
-            `).join('');
+                `;
+            });
             $('#personalList').html(persHtml);
 
-            // Render Pending List
-            const pendHtml = (currentData.pendingExpenses || []).map(item => `
+            // Render Pending List with serial numbers
+            const pendArr = (currentData.pendingExpenses || []).slice().reverse();
+            let pendHtml = '';
+            pendArr.forEach((item, idx) => {
+                const sn = idx + 1;
+                pendHtml += `
                 <div class="flex justify-between items-center p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm group">
                     <div>
-                        <div class="font-medium">${item.reason}</div>
+                        <div class="font-medium"><span class="text-slate-500 font-mono w-6 inline-block">${sn}.</span> ${item.reason}</div>
                         <div class="text-sm text-slate-500 dark:text-slate-400">${item.date || ''}</div>
                         <div class="text-sm text-orange-500 dark:text-orange-400">${item.category}</div>
                     </div>
@@ -901,15 +957,16 @@
                             <div class="font-bold">₹${item.amount}</div>
                             <div class="text-sm text-slate-500">${item.mode || 'Online'}</div>
                         </div>
-                        <button onclick="payItem('${item.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded" title="Mark Paid">
+                        <button onclick="payItem('${item.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded" title="Mark Paid">
                             <i data-lucide="check" class="w-4 h-4"></i>
                         </button>
-                        <button onclick="deleteItem('pendingExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100 p-1">
+                        <button onclick="deleteItem('pendingExpenses', '${item.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 p-1">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
-            `).join('');
+                `;
+            });
             $('#pendingList').html(pendHtml);
 
             lucide.createIcons();
@@ -1452,9 +1509,13 @@
                 list.empty();
                 let totalRemaining = 0;
 
-                data.forEach(item => {
+                // Reverse to show latest first and maintain serial ordering
+                const items = data.slice().reverse();
+                let lpIndex = 0;
+                items.forEach(item => {
                     if (item.status === 'completed') return; // Skip completed for now or show differently
 
+                    lpIndex++;
                     totalRemaining += item.remainingAmount;
                     const percent = Math.min(100, (item.paidAmount / item.totalAmount) * 100);
 
@@ -1462,7 +1523,7 @@
                         <div class="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm group">
                             <div class="flex justify-between items-start mb-2">
                                 <div>
-                                    <div class="font-medium">${item.reason}</div>
+                                    <div class="font-medium"><span class="text-slate-500 font-mono w-6 inline-block">${lpIndex}.</span> ${item.reason}</div>
                                     <div class="text-xs text-slate-500 dark:text-slate-400">Total: ₹${item.totalAmount.toLocaleString()}</div>
                                 </div>
                                 <div class="text-right">
@@ -1477,10 +1538,10 @@
                             </div>
 
                             <div class="flex justify-end gap-2">
-                                <button onclick="payLongPending(${item.id}, '${item.reason}', ${item.remainingAmount})" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded flex items-center gap-1">
+                                <button onclick="payLongPending(${item.id}, '${item.reason}', ${item.remainingAmount})" class="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded flex items-center gap-1">
                                     <i data-lucide="banknote" class="w-3 h-3"></i> Pay
                                 </button>
-                                <button onclick="deleteLongPending('${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100 p-1">
+                                <button onclick="deleteLongPending('${item.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 p-1">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -1593,7 +1654,7 @@
                         <!-- Delete button could go here if implemented -->
                     </div>
                 `);
-            });
+                       });
         }
 
         function showAccountsModal() {
