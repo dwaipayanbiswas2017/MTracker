@@ -1,19 +1,29 @@
-import os
-import json
 import csv
 import io
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from database_controller import DatabaseController
+import dotenv
+import os
 
+# Load environment variables from .env file
+dotenv.load_dotenv()
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # Change this in production
-DATA_DIR = 'data'
-USERS_FILE = 'users.json'
 
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+# Database Configuration
+DB_CONFIG = {
+    'host': os.getenv('host'),
+    'user': os.getenv('user'),
+    'password': os.getenv('password'),
+    'database': os.getenv('database')
+}
+
+print(f"DB_Config: {DB_CONFIG}")
+
+db = DatabaseController(DB_CONFIG)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -29,27 +39,11 @@ class User(UserMixin):
         self.username = username
         self.password_hash = password_hash
 
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    with open(USERS_FILE, 'r') as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            return {}
-
-def save_users(users):
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=4)
-
 @login_manager.user_loader
 def load_user(user_id):
-    users = load_users()
-    if user_id in users:
-        u = users[user_id]
-        # Handle missing 'name' for old users
-        name = u.get('name', u['username'])
-        return User(user_id, name, u['username'], u['password_hash'])
+    u = db.get_user_by_id(user_id)
+    if u:
+        return User(user_id, u['name'], u['username'], u['password_hash'])
     return None
 
 # --- Data Management ---
@@ -83,35 +77,6 @@ def parse_month_date(date_str):
 
     return None
 
-def get_user_data_file():
-    return os.path.join(DATA_DIR, f"{current_user.id}.json")
-
-def load_data():
-    if not current_user.is_authenticated:
-        return {}
-
-    filepath = get_user_data_file()
-    if not os.path.exists(filepath):
-        # Initialize with default categories
-        return {"categories": ["Bills", "Food", "Family", "EMI", "CC", "Other"]}
-
-    with open(filepath, 'r') as f:
-        data = json.load(f)
-        # Ensure categories exist
-        if "categories" not in data:
-            data["categories"] = ["Bills", "Food", "Family", "EMI", "CC", "Other"]
-        # Ensure accounts exist
-        if "accounts" not in data:
-            data["accounts"] = ["Cash"]
-        return data
-
-def save_data(data):
-    if not current_user.is_authenticated:
-        return
-    filepath = get_user_data_file()
-    with open(filepath, 'w') as f:
-        json.dump(data, f, indent=4)
-
 # --- Auth Routes ---
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -119,22 +84,11 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        users = load_users()
 
-        # Simple lookup (username as key for simplicity in this file-based system)
-        # Ideally we store by ID, but let's use username as ID for simplicity or search
-        user_data = None
-        user_id = None
-
-        for uid, u in users.items():
-            if u['username'] == username:
-                user_data = u
-                user_id = uid
-                break
+        user_data = db.get_user_by_username(username)
 
         if user_data and check_password_hash(user_data['password_hash'], password):
-            name = user_data.get('name', username)
-            user = User(user_id, name, username, user_data['password_hash'])
+            user = User(user_data['id'], user_data['name'], username, user_data['password_hash'])
             login_user(user)
             return redirect(url_for('index'))
 
@@ -147,25 +101,20 @@ def register():
         name = request.form['name']
         username = request.form['username']
         password = request.form['password']
-        users = load_users()
 
-        for u in users.values():
-            if u['username'] == username:
-                flash('Username already exists')
-                return redirect(url_for('register'))
+        if db.get_user_by_username(username):
+            flash('Username already exists')
+            return redirect(url_for('register'))
 
         user_id = str(datetime.now().timestamp())
-        users[user_id] = {
-            'name': name,
-            'username': username,
-            'password_hash': generate_password_hash(password)
-        }
-        save_users(users)
+        password_hash = generate_password_hash(password)
 
-        # Log them in
-        user = User(user_id, name, username, users[user_id]['password_hash'])
-        login_user(user)
-        return redirect(url_for('index'))
+        if db.create_user(user_id, name, username, password_hash):
+            user = User(user_id, name, username, password_hash)
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            flash('Error creating account. Please try again.')
 
     return render_template('register.html')
 
@@ -184,8 +133,21 @@ def index():
 @app.route('/api/categories', methods=['GET'])
 @login_required
 def get_categories():
-    data = load_data()
-    return jsonify(data.get('categories', []))
+    categories = db.get_categories(current_user.id)
+    return jsonify(categories)
+
+@app.route('/api/categories/update', methods=['POST'])
+@login_required
+def update_category():
+    old_name = request.json.get('old_name')
+    new_name = request.json.get('new_name')
+    if not old_name or not new_name:
+        return jsonify({"status": "error", "message": "Both old and new category names required"}), 400
+
+    if db.update_category(current_user.id, old_name, new_name):
+        categories = db.get_categories(current_user.id)
+        return jsonify({"status": "success", "categories": categories})
+    return jsonify({"status": "error", "message": "Could not update category (check if name is unique)"}), 500
 
 @app.route('/api/categories', methods=['POST'])
 @login_required
@@ -194,18 +156,29 @@ def add_category():
     if not new_cat:
         return jsonify({"status": "error", "message": "Category name required"}), 400
 
-    data = load_data()
-    if new_cat not in data['categories']:
-        data['categories'].append(new_cat)
-        save_data(data)
-
-    return jsonify({"status": "success", "categories": data['categories']})
+    if db.add_category(current_user.id, new_cat):
+        categories = db.get_categories(current_user.id)
+        return jsonify({"status": "success", "categories": categories})
+    return jsonify({"status": "error", "message": "Could not add category"}), 500
 
 @app.route('/api/accounts', methods=['GET'])
 @login_required
 def get_accounts():
-    data = load_data()
-    return jsonify(data.get('accounts', []))
+    accounts = db.get_accounts(current_user.id)
+    return jsonify(accounts)
+
+@app.route('/api/accounts/update', methods=['POST'])
+@login_required
+def update_account():
+    old_name = request.json.get('old_name')
+    new_name = request.json.get('new_name')
+    if not old_name or not new_name:
+        return jsonify({"status": "error", "message": "Both old and new account names required"}), 400
+
+    if db.update_account(current_user.id, old_name, new_name):
+        accounts = db.get_accounts(current_user.id)
+        return jsonify({"status": "success", "accounts": accounts})
+    return jsonify({"status": "error", "message": "Could not update account (check if name is unique)"}), 500
 
 @app.route('/api/accounts', methods=['POST'])
 @login_required
@@ -214,30 +187,25 @@ def add_account():
     if not new_acc:
         return jsonify({"status": "error", "message": "Account name required"}), 400
 
-    data = load_data()
-    if new_acc not in data['accounts']:
-        data['accounts'].append(new_acc)
-        save_data(data)
-
-    return jsonify({"status": "success", "accounts": data['accounts']})
+    if db.add_account(current_user.id, new_acc):
+        accounts = db.get_accounts(current_user.id)
+        return jsonify({"status": "success", "accounts": accounts})
+    return jsonify({"status": "error", "message": "Could not add account"}), 500
 
 @app.route('/api/months', methods=['GET'])
 @login_required
 def get_months():
-    data = load_data()
-    # Filter out non-month keys like 'categories', 'accounts' and '_longPending'
-    months = [k for k in data.keys() if k not in ['categories', 'accounts', '_longPending']]
+    months = db.get_months(current_user.id)
 
     def sort_key(m):
         d = parse_month_date(m)
-        # If parse fails, put it at the start (or end?) - let's put at start to be visible
         return d if d else datetime.min
 
     months.sort(key=sort_key)
 
     current_month_str = datetime.now().strftime('%Y-%m')
 
-    # Check if current month exists (using robust parse to check equivalence)
+    # Check if current month exists
     now = datetime.now()
     current_month_exists = False
     for m in months:
@@ -247,7 +215,6 @@ def get_months():
             break
 
     if not current_month_exists:
-        # If the current month doesn't exist, add it and re-sort
         months.append(current_month_str)
         months.sort(key=sort_key)
 
@@ -256,10 +223,10 @@ def get_months():
 @app.route('/api/month/<month_id>', methods=['GET'])
 @login_required
 def get_month_data(month_id):
-    all_data = load_data()
+    month_data = db.get_month_data(current_user.id, month_id)
 
-    if month_id in all_data:
-        return jsonify(all_data.get(month_id, {}))
+    if month_data:
+        return jsonify(month_data)
 
     # ---[ AUTO-CREATE MONTH LOGIC ]---
     # If month_id doesn't exist, create it on the fly.
@@ -267,58 +234,13 @@ def get_month_data(month_id):
     if not new_month_date:
         return jsonify({"status": "error", "message": "Invalid month format"}), 400
 
-    # Find the most recent month before the new one to be its predecessor.
-    prev_month_id = None
-    latest_prev_date = None
+    db.create_month(current_user.id, month_id, copy_pending=True)
+    month_data = db.get_month_data(current_user.id, month_id)
 
-    month_keys = [k for k in all_data.keys() if k not in ['categories', 'accounts', '_longPending']]
-    for key in month_keys:
-        d = parse_month_date(key)
-        if d:
-            if d < new_month_date:
-                if latest_prev_date is None or d > latest_prev_date:
-                    latest_prev_date = d
-                    prev_month_id = key
+    if month_data:
+        return jsonify(month_data)
 
-    # If a previous month is found, calculate the closing balance.
-    if prev_month_id:
-        prev_data = all_data.get(prev_month_id, {})
-        prev_opening = prev_data.get('openingBalance', {})
-        if isinstance(prev_opening, (int, float)):
-            prev_opening = {'Cash': float(prev_opening)}
-
-        closing_balances = prev_opening.copy()
-
-        for inc in prev_data.get('income', []):
-            acc = inc.get('account', 'Cash')
-            closing_balances[acc] = closing_balances.get(acc, 0) + float(inc.get('amount', 0))
-        for exp in prev_data.get('paidExpenses', []):
-            acc = exp.get('account', 'Cash')
-            closing_balances[acc] = closing_balances.get(acc, 0) - float(exp.get('amount', 0))
-        for pers in prev_data.get('personalExpenses', []):
-            acc = pers.get('account', 'Cash')
-            closing_balances[acc] = closing_balances.get(acc, 0) - float(pers.get('amount', 0))
-
-        opening_balance = closing_balances
-        # Copy pending expenses from the previous month
-        pending_expenses = prev_data.get('pendingExpenses', [])
-    else:
-        # No previous month, so start fresh.
-        opening_balance = {}
-        pending_expenses = []
-
-    new_data = {
-        "income": [],
-        "openingBalance": opening_balance,
-        "paidExpenses": [],
-        "personalExpenses": [],
-        "pendingExpenses": pending_expenses
-    }
-
-    all_data[month_id] = new_data
-    save_data(all_data)
-
-    return jsonify(new_data)
+    return jsonify({"status": "error", "message": "Could not create month data"}), 500
 
 @app.route('/api/save', methods=['POST'])
 @login_required
@@ -327,10 +249,9 @@ def save_month_data():
     month_id = req.get('id')
     month_data = req.get('data')
 
-    all_data = load_data()
-    all_data[month_id] = month_data
-    save_data(all_data)
-    return jsonify({"status": "success"})
+    if db.save_month_data(current_user.id, month_id, month_data):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not save month data"}), 500
 
 @app.route('/api/create_month', methods=['POST'])
 @login_required
@@ -344,89 +265,30 @@ def create_month():
 
     # Validate format YYYY-MM
     try:
-        new_month_date = datetime.strptime(month_input, '%Y-%m')
-        # We will use the YYYY-MM format as the ID for new months to keep it standard
+        datetime.strptime(month_input, '%Y-%m')
         new_month_id = month_input
     except ValueError:
         return jsonify({"status": "error", "message": "Invalid date format"}), 400
 
-    all_data = load_data()
+    # Check if month already exists
+    existing_months = db.get_months(current_user.id)
+    if new_month_id in existing_months:
+         return jsonify({"status": "error", "message": f"Month {new_month_id} already exists"}), 400
 
-    # Check if month already exists (check for overlap with existing keys)
-    # We check if any existing key represents the same month/year
-    for k in all_data.keys():
-        if k in ['categories', 'accounts', '_longPending']: continue
-        d = parse_month_date(k)
-        if d and d.year == new_month_date.year and d.month == new_month_date.month:
-             return jsonify({"status": "error", "message": f"Month {k} already exists"}), 400
+    db.create_month(current_user.id, new_month_id, copy_pending)
+    new_data = db.get_month_data(current_user.id, new_month_id)
 
-    # Find previous month automatically
-    prev_month_id = None
-    latest_prev_date = None
-
-    month_keys = [k for k in all_data.keys() if k not in ['categories', 'accounts', '_longPending']]
-    for key in month_keys:
-        d = parse_month_date(key)
-        if d and d < new_month_date:
-            if latest_prev_date is None or d > latest_prev_date:
-                latest_prev_date = d
-                prev_month_id = key
-
-    prev_data = all_data.get(prev_month_id, {})
-
-    # Calculate Previous Closing Balance per Account
-    # Opening + Income - (Paid + Personal)
-
-    # 1. Get Opening Balances
-    prev_opening = prev_data.get('openingBalance', {})
-    if isinstance(prev_opening, (int, float)):
-        # Legacy support: assume 'Cash' if it was a single number
-        prev_opening = {'Cash': float(prev_opening)}
-
-    # 2. Initialize Closing with Opening
-    closing_balances = prev_opening.copy()
-
-    # 3. Add Income
-    for inc in prev_data.get('income', []):
-        acc = inc.get('account', 'Cash') # Default to Cash if missing
-        closing_balances[acc] = closing_balances.get(acc, 0) + float(inc.get('amount', 0))
-
-    # 4. Subtract Paid Expenses
-    for exp in prev_data.get('paidExpenses', []):
-        acc = exp.get('account', 'Cash')
-        closing_balances[acc] = closing_balances.get(acc, 0) - float(exp.get('amount', 0))
-
-    # 5. Subtract Personal Expenses
-    for pers in prev_data.get('personalExpenses', []):
-        acc = pers.get('account', 'Cash')
-        closing_balances[acc] = closing_balances.get(acc, 0) - float(pers.get('amount', 0))
-
-    new_data = {
-        "income": [],
-        "openingBalance": closing_balances,
-        "paidExpenses": [],
-        "personalExpenses": [],
-        "pendingExpenses": []
-    }
-
-    if copy_pending:
-        # Copy pending items from previous month
-        new_data['pendingExpenses'] = prev_data.get('pendingExpenses', [])
-
-    all_data[new_month_id] = new_data
-    save_data(all_data)
-
-    return jsonify({"status": "success", "data": new_data, "id": new_month_id})
+    if new_data:
+        return jsonify({"status": "success", "data": new_data, "id": new_month_id})
+    return jsonify({"status": "error", "message": "Could not create month"}), 500
 
 @app.route('/api/delete_month', methods=['POST'])
 @login_required
 def delete_month():
     month_id = request.json.get('id')
-    all_data = load_data()
-    if month_id in all_data:
-        del all_data[month_id]
-        save_data(all_data)
-    return jsonify({"status": "success"})
+    if db.delete_month(current_user.id, month_id):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not delete month"}), 500
 
 # --- CSV Import Logic ---
 @app.route('/api/import', methods=['POST'])
@@ -539,58 +401,50 @@ def import_csv():
             continue
 
     # Merge into DB
-    all_data = load_data()
-    all_data[month_id] = {
-        "income": [{'id': 'csv-import', 'source': 'CSV Import', 'amount': income}],
-        "openingBalance": opening_balance,
+    month_data = {
+        "income": [{'id': 'csv-import', 'source': 'CSV Import', 'amount': income, 'account': 'Cash'}],
+        "openingBalance": {'Cash': opening_balance},
         "paidExpenses": paid_expenses,
         "pendingExpenses": pending_expenses,
         "personalExpenses": personal_expenses
     }
-    save_data(all_data)
 
-    return jsonify({"status": "success", "data": all_data[month_id]})
+    if db.sync_bulk_data(current_user.id, month_id, month_data):
+        return jsonify({"status": "success", "data": month_data})
+
+    return jsonify({"status": "error", "message": "Could not import CSV data"}), 500
 
 # --- Long Pending Payments (Global) ---
 @app.route('/api/long_pending', methods=['GET'])
 @login_required
 def get_all_long_pending():
-    data = load_data()
-    return jsonify(data.get('_longPending', []))
+    long_pending = db.get_long_pending(current_user.id)
+    return jsonify(long_pending)
 
 @app.route('/api/long_pending', methods=['POST'])
 @login_required
 def add_long_pending():
     req = request.json
-    all_data = load_data()
-
-    if '_longPending' not in all_data:
-        all_data['_longPending'] = []
 
     new_item = {
-        "id": req.get('id'),
+        "id": req.get('id') or str(datetime.now().timestamp()),
         "reason": req.get('reason'),
         "totalAmount": float(req.get('totalAmount')),
         "paidAmount": float(req.get('paidAmount', 0)),
-        "remainingAmount": float(req.get('totalAmount')) - float(req.get('paidAmount', 0)),
-        "category": req.get('category', ''),
-        "createdDate": req.get('createdDate', datetime.now().strftime('%Y-%m-%d')),
-        "status": "active"
+        "category": req.get('category', 'General'),
+        "createdDate": req.get('createdDate', datetime.now().strftime('%Y-%m-%d'))
     }
 
-    all_data['_longPending'].append(new_item)
-    save_data(all_data)
-
-    return jsonify({"status": "success", "data": new_item})
+    if db.add_long_pending(current_user.id, new_item):
+        return jsonify({"status": "success", "data": new_item})
+    return jsonify({"status": "error", "message": "Could not add long pending item"}), 500
 
 @app.route('/api/long_pending/<item_id>', methods=['DELETE'])
 @login_required
 def delete_long_pending(item_id):
-    all_data = load_data()
-    long_pending = all_data.get('_longPending', [])
-    all_data['_longPending'] = [item for item in long_pending if str(item.get('id')) != str(item_id)]
-    save_data(all_data)
-    return jsonify({"status": "success"})
+    if db.delete_long_pending(current_user.id, item_id):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not delete long pending item"}), 500
 
 @app.route('/api/long_pending/<item_id>/partial_payment', methods=['POST'])
 @login_required
@@ -598,6 +452,8 @@ def make_partial_payment(item_id):
     req = request.json
     payment_amount = float(req.get('amount', 0))
     month_id = req.get('month_id')
+    account = req.get('account')
+    mode = req.get('mode', 'Online')
 
     if payment_amount <= 0:
         return jsonify({"status": "error", "message": "Payment amount must be positive"}), 400
@@ -605,89 +461,17 @@ def make_partial_payment(item_id):
     if not month_id:
         return jsonify({"status": "error", "message": "Month ID required"}), 400
 
-    all_data = load_data()
+    if db.make_partial_payment(current_user.id, item_id, month_id, payment_amount, account, mode):
+        return jsonify({"status": "success"})
 
-    if month_id not in all_data:
-        return jsonify({"status": "error", "message": "Month not found"}), 404
-
-    long_pending = all_data.get('_longPending', [])
-    item_found = False
-
-    for item in long_pending:
-        if str(item.get('id')) == str(item_id):
-            if payment_amount > item['remainingAmount']:
-                return jsonify({"status": "error", "message": "Payment exceeds remaining amount"}), 400
-
-            item['paidAmount'] += payment_amount
-            item['remainingAmount'] -= payment_amount
-
-            if item['remainingAmount'] <= 0:
-                item['status'] = 'completed'
-
-            # Add to month's paid expenses
-            if 'paidExpenses' not in all_data[month_id]:
-                all_data[month_id]['paidExpenses'] = []
-
-            payment_entry = {
-                "id": f"lp-{item_id}-{int(datetime.now().timestamp())}",
-                "reason": f"Partial: {item['reason']}",
-                "category": "Long Pending",
-                "date": datetime.now().strftime('%Y-%m-%d'),
-                "amount": payment_amount,
-                "mode": req.get('mode', 'Online'),
-                "isLongPending": True,
-                "linkedId": item_id
-            }
-
-            all_data[month_id]['paidExpenses'].append(payment_entry)
-            item_found = True
-            break
-
-    if not item_found:
-        return jsonify({"status": "error", "message": "Item not found"}), 404
-
-    save_data(all_data)
-    return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not process partial payment"}), 500
 
 @app.route('/api/month/<month_id>/expense/<expense_id>', methods=['DELETE'])
 @login_required
 def delete_expense(month_id, expense_id):
-    all_data = load_data()
-    if month_id not in all_data:
-        return jsonify({"status": "error", "message": "Month not found"}), 404
-
-    month_data = all_data[month_id]
-    paid_expenses = month_data.get('paidExpenses', [])
-
-    expense_to_delete = None
-    new_paid_expenses = []
-
-    for exp in paid_expenses:
-        if str(exp.get('id')) == str(expense_id):
-            expense_to_delete = exp
-        else:
-            new_paid_expenses.append(exp)
-
-    if not expense_to_delete:
-        return jsonify({"status": "error", "message": "Expense not found"}), 404
-
-    # If it's a long pending payment, reverse the transaction
-    if expense_to_delete.get('isLongPending') and expense_to_delete.get('linkedId'):
-        linked_id = expense_to_delete.get('linkedId')
-        amount = float(expense_to_delete.get('amount', 0))
-
-        long_pending = all_data.get('_longPending', [])
-        for item in long_pending:
-            if str(item.get('id')) == str(linked_id):
-                item['paidAmount'] -= amount
-                item['remainingAmount'] += amount
-                item['status'] = 'active' # Re-activate if it was completed
-                break
-
-    all_data[month_id]['paidExpenses'] = new_paid_expenses
-    save_data(all_data)
-
-    return jsonify({"status": "success"})
+    if db.delete_expense(current_user.id, month_id, expense_id):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not delete expense"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
