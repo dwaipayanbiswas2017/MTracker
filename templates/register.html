@@ -25,8 +25,8 @@
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="flex items-center justify-center h-screen">
-    <div class="w-full max-w-md p-4 md:p-8 space-y-6 bg-slate-800 rounded-lg shadow-lg border border-slate-700">
+<body class="flex flex-col min-h-screen items-center justify-center p-4">
+    <div class="w-full max-w-md p-4 md:p-8 space-y-6 bg-slate-800 rounded-lg shadow-lg border border-slate-700 my-auto">
         <div class="flex items-center gap-2 justify-center mb-6">
             <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
             <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
@@ -58,6 +58,17 @@
             Already have an account? <a href="/login" class="text-blue-400 hover:underline">Login</a>
         </p>
     </div>
+
+    <!-- Footer -->
+    <footer class="mt-8 py-6 text-slate-500 text-xs text-center w-full">
+        <div class="flex justify-center gap-6 mb-3">
+            <a href="#" class="hover:text-blue-400 transition-colors">Privacy Policy</a>
+            <a href="#" class="hover:text-blue-400 transition-colors">Terms of Service</a>
+            <a href="mailto:support@mtracker.com" class="hover:text-blue-400 transition-colors">Support</a>
+        </div>
+        <p>&copy; 2026 MTracker Systems. Secure Personalized Finance Tracking.</p>
+    </footer>
+
     <script>
         lucide.createIcons();
     </script>

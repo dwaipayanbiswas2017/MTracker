@@ -112,7 +112,7 @@
             background-color: rgba(30, 41, 59, 0.5);
         }
         .dark .hover\:bg-slate-800\/50:hover {
-            background-color: rgba(30, 41, 59, 0.5);
+            background-color: rgba(255, 255, 255, 0.05);
         }
         .light .hover\:bg-slate-800\/50:hover {
             background-color: rgba(241, 245, 249, 0.5);
@@ -186,7 +186,7 @@
         }
         .accordion-content.expanded {
             max-height: 2000px;
-            padding: 0 1rem 1rem 1rem;
+            padding: 1rem 1rem 1rem 1rem;
         }
         .accordion-chevron {
             transition: transform 0.3s ease;
@@ -282,20 +282,63 @@
                     <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
                 </button>
 
-                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors" title="Logout">
-                    <i data-lucide="log-out" class="w-4 h-4"></i>
-                    <span class="font-medium">Logout</span>
-                </a>
+                <!-- Profile Dropdown -->
+                <div class="relative" id="profile-dropdown-container">
+                    <button onclick="toggleProfileDropdown(event)" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded flex items-center gap-2 h-10 transition-colors border border-slate-600">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-500"
+                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-500">
+                        {% endif %}
+                        <span class="font-medium mr-1">{{ current_user.name.split(' ')[0] if current_user.name else 'User' }}</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 opacity-50"></i>
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
+                            Profile Settings
+                        </a>
+                        <div class="border-t border-slate-200 dark:border-slate-700 my-1"></div>
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <!-- Mobile Quick Actions (Theme & Logout only) -->
+            <!-- Mobile Quick Actions -->
             <div class="flex md:hidden gap-2 items-center">
                 <button id="theme-toggle-mobile" class="bg-slate-600 hover:bg-slate-700 text-white p-2.5 rounded transition-colors" title="Toggle Theme">
                     <i id="theme-icon-mobile" data-lucide="sun" class="w-5 h-5"></i>
                 </button>
-                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white p-2.5 rounded transition-colors" title="Logout">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
-                </a>
+                <div class="relative" id="profile-dropdown-container-mobile">
+                    <button onclick="toggleProfileDropdownMobile(event)" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded transition-colors border border-blue-500">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-8 h-8 rounded-full object-cover"
+                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                                 class="w-8 h-8 rounded-full object-cover">
+                        {% endif %}
+                    </button>
+                    <!-- Mobile Dropdown Menu -->
+                    <div id="profile-dropdown-menu-mobile" class="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
+                            Profile
+                        </a>
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -504,7 +547,6 @@
                     </div>
                 </div>
                 <div class="accordion-content" id="personal-content">
-                    <div class="text-xs text-slate-400 mb-2">Sum deducted from Current Balance as one total.</div>
 
                     <!-- Toggle Add Form Button -->
                     <div class="flex justify-end mb-2">
@@ -513,6 +555,8 @@
                             <span>Add Daily Expense</span>
                         </button>
                     </div>
+
+                    <div class="text-xs text-slate-400 mb-2">Sum deducted from Current Balance as one total.</div>
 
                     <!-- Add Personal Form (Hidden by default) -->
                     <div class="add-form-container" id="personal-form">
@@ -961,8 +1005,51 @@
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="mt-12 pt-10 border-t border-slate-200 dark:border-slate-800 text-slate-400 text-sm max-w-6xl mx-auto px-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+            <div class="col-span-1 md:col-span-2 space-y-4">
+                <div class="flex items-center gap-2 text-slate-200">
+                    <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+                        <i data-lucide="wallet" class="w-5 h-5"></i>
+                    </div>
+                    <span class="font-bold text-lg">MTracker</span>
+                </div>
+                <p class="max-w-md">The modern approach to managing your personal finances. Track every penny, analyze your spending, and achieve your financial goals with ease.</p>
+                <div class="flex gap-4">
+                    <a href="https://github.com/dwaipayanbiswas2017/MTracker" target="_blank" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white">
+                        <i data-lucide="github" class="w-5 h-5"></i>
+                    </a>
+                    <a href="mailto:support@mtracker.com" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white">
+                        <i data-lucide="mail" class="w-5 h-5"></i>
+                    </a>
+                </div>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Navigation</h4>
+                <ul class="space-y-3">
+                    <li><a href="{{ url_for('index') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard</a></li>
+                    <li><a href="{{ url_for('profile') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="user-cog" class="w-4 h-4"></i> Profile Settings</a></li>
+                    <li><button onclick="showAccountsModal()" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="credit-card" class="w-4 h-4"></i> Accounts</button></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Resources</h4>
+                <ul class="space-y-3">
+                    <li><a href="#" class="hover:text-blue-500 transition-colors">Documentation</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition-colors">Privacy Policy</a></li>
+                    <li><button onclick="exportPDF()" class="hover:text-blue-500 transition-colors">Export Data</button></li>
+                </ul>
+            </div>
+        </div>
+        <div class="text-center py-6 border-t border-slate-200 dark:border-slate-800 opacity-60">
+            &copy; 2026 MTracker Systems. All rights reserved. Made for personal use.
+        </div>
+    </footer>
+
     <!-- Scripts -->
     <script>
+        const DEFAULT_ACCOUNT_ID = "{{ user.default_account_id or '' }}";
         let currentData = {};
         let currentMonthId = '';
         let accounts = [];
@@ -1074,7 +1161,20 @@
             if(currentData && currentMonthId) renderCharts(); // Re-render chart on theme change
         }
 
+        function toggleProfileDropdown(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu').toggleClass('hidden');
+        }
 
+        function toggleProfileDropdownMobile(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu-mobile').toggleClass('hidden');
+        }
+
+        $(document).click(function() {
+            $('#profile-dropdown-menu').addClass('hidden');
+            $('#profile-dropdown-menu-mobile').addClass('hidden');
+        });
         // --- API Calls ---
 
         function loadCategories() {
@@ -1348,7 +1448,10 @@
             // --- Calculate Per-Account Balances ---
             let initialAccountBalances = { ...openingBalances };
             // Ensure all accounts exist in balances with 0 if not present
-            accounts.forEach(acc => { if (initialAccountBalances[acc] === undefined) initialAccountBalances[acc] = 0; });
+            accounts.forEach(acc => {
+                const name = acc.account_name;
+                if (initialAccountBalances[name] === undefined) initialAccountBalances[name] = 0;
+            });
 
             // Add Income to Initial
             (currentData.income || []).forEach(item => {
@@ -1374,7 +1477,7 @@
             // Update Opening Balances UI
             const openingContainer = $('#openingBalancesContainer');
             openingContainer.empty();
-            const allAccounts = new Set([...accounts, ...Object.keys(openingBalances)]);
+            const allAccounts = new Set([...accounts.map(a => a.account_name), ...Object.keys(openingBalances)]);
 
             allAccounts.forEach(acc => {
                 const val = openingBalances[acc];
@@ -1660,9 +1763,9 @@
                             position: 'right',
                             labels: {
                                 color: textColor,
-                                font: { size: 10 },
-                                boxWidth: 8,
-                                padding: 5
+                                font: { size: 14 },
+                                boxWidth: 10,
+                                padding: 10
                             }
                         },
                         tooltip: {
@@ -1810,14 +1913,23 @@
             $('#payPendingReason').text(`Paying: ${item.reason} (₹${item.amount})`);
 
             // Populate accounts
-            const options = accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+            const options = accounts.map(a => `<option value="${a.account_name}">${a.account_name}</option>`).join('');
             $('#payPendingAccount').html(options);
 
-            // Try to select 'Bank' or 'Cash' as default if available, otherwise first
-            if (accounts.includes('Bank')) $('#payPendingAccount').val('Bank');
-            else if (accounts.includes('Cash')) $('#payPendingAccount').val('Cash');
+            // Try to select Default Account if set, otherwise try 'Bank' or 'Cash'
+            let selectedAcc = '';
+            if (DEFAULT_ACCOUNT_ID) {
+                const defAcc = accounts.find(a => String(a.id) === String(DEFAULT_ACCOUNT_ID));
+                if (defAcc) selectedAcc = defAcc.account_name;
+            }
 
-            $('#payPendingModal').removeClass('hidden').addClass('flex');
+            if (!selectedAcc) {
+                if (accounts.some(a => a.account_name === 'Bank')) selectedAcc = 'Bank';
+                else if (accounts.some(a => a.account_name === 'Cash')) selectedAcc = 'Cash';
+                else if (accounts.length > 0) selectedAcc = accounts[0].account_name;
+            }
+
+            if (selectedAcc) $('#payPendingAccount').val(selectedAcc);            $('#payPendingModal').removeClass('hidden').addClass('flex');
         }
 
         function closePayPendingModal() {
@@ -1936,7 +2048,7 @@
             }
 
             // Get all unique accounts involved
-            const allAccounts = new Set([...accounts, ...Object.keys(openingBalances)]);
+            const allAccounts = new Set([...accounts.map(a => a.account_name), ...Object.keys(openingBalances)]);
 
             allAccounts.forEach(acc => {
                 accountStats[acc] = {
@@ -2238,12 +2350,23 @@
             $('#payLongPendingAmount').val('').attr('max', maxAmount);
 
             // Populate accounts
-            const options = accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+            const options = accounts.map(a => `<option value="${a.account_name}">${a.account_name}</option>`).join('');
             $('#payLongPendingAccount').html(options);
 
-            // Try to select 'Bank' or 'Cash' as default if available
-            if (accounts.includes('Bank')) $('#payLongPendingAccount').val('Bank');
-            else if (accounts.includes('Cash')) $('#payLongPendingAccount').val('Cash');
+            // Try to select Default Account if set, otherwise try 'Bank' or 'Cash'
+            let selectedAcc = '';
+            if (DEFAULT_ACCOUNT_ID) {
+                const defAcc = accounts.find(a => String(a.id) === String(DEFAULT_ACCOUNT_ID));
+                if (defAcc) selectedAcc = defAcc.account_name;
+            }
+
+            if (!selectedAcc) {
+                if (accounts.some(a => a.account_name === 'Bank')) selectedAcc = 'Bank';
+                else if (accounts.some(a => a.account_name === 'Cash')) selectedAcc = 'Cash';
+                else if (accounts.length > 0) selectedAcc = accounts[0].account_name;
+            }
+
+            if (selectedAcc) $('#payLongPendingAccount').val(selectedAcc);
 
             $('#payLongPendingModal').removeClass('hidden').addClass('flex');
             lucide.createIcons();
@@ -2296,6 +2419,14 @@
 
         function loadAccounts() {
             $.get('/api/accounts', function(accs) {
+                // Reorder accounts based on DEFAULT_ACCOUNT_ID
+                if (DEFAULT_ACCOUNT_ID) {
+                    const defaultAccIndex = accs.findIndex(a => String(a.id) === String(DEFAULT_ACCOUNT_ID));
+                    if (defaultAccIndex > -1) {
+                        const defaultAcc = accs.splice(defaultAccIndex, 1)[0];
+                        accs.unshift(defaultAcc);
+                    }
+                }
                 accounts = accs;
                 updateAccountDropdowns();
                 renderAccountsList();
@@ -2305,22 +2436,35 @@
         }
 
         function updateAccountDropdowns() {
-            const options = '<option value="">Account...</option>' + accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+            const options = '<option value="">Account...</option>' + accounts.map(a => `<option value="${a.account_name}">${a.account_name}</option>`).join('');
             $('#newPaidAccount').html(options);
             $('#newIncomeAccount').html(options);
             $('#newPersAccount').html(options);
             $('#payLongPendingAccount').html(options);
+
+            // Pre-select default account if available
+            if (DEFAULT_ACCOUNT_ID) {
+                const defAcc = accounts.find(a => String(a.id) === String(DEFAULT_ACCOUNT_ID));
+                if (defAcc) {
+                    const name = defAcc.account_name;
+                    $('#newPaidAccount').val(name);
+                    $('#newIncomeAccount').val(name);
+                    $('#newPersAccount').val(name);
+                    $('#payLongPendingAccount').val(name);
+                }
+            }
         }
 
         function renderAccountsList() {
             const list = $('#accountsList');
             list.empty();
             accounts.forEach(acc => {
+                const name = acc.account_name;
                 list.append(`
                     <div class="flex justify-between items-center p-2 bg-slate-100 dark:bg-slate-700 rounded mb-1">
-                        <span>${acc}</span>
+                        <span>${name}</span>
                         <div class="flex gap-2">
-                            <button onclick="editAccount('${acc}')" class="text-blue-500 hover:text-blue-400 p-1" title="Edit Account Name">
+                            <button onclick="editAccount('${name}')" class="text-blue-500 hover:text-blue-400 p-1" title="Edit Account Name">
                                 <i data-lucide="edit-2" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -2389,7 +2533,7 @@
                 <div class="p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded shadow-sm group">
                     <div class="flex justify-between items-start mb-2">
                         <div class="flex-1">
-                            <div class="font-medium text-cyan-700 dark:text-cyan-300" onclick="viewNote('${note.id}')">
+                            <div class="font-bold text-cyan-700 dark:text-cyan-300" onclick="viewNote('${note.id}')">
                                 <span class="text-cyan-500 font-mono w-6 inline-block">${sn}.</span>
                                 ${note.title || 'Untitled Note'}
                             </div>

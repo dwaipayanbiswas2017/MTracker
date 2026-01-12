@@ -42,39 +42,88 @@ class DatabaseController:
         finally:
             conn.close()
 
-    def get_user_by_username(self, username):
+    def get_user_by_identifier(self, identifier):
         """
-        Retrieves a user by their username (e.g., phone number).
-        :param username: The login username.
+        Retrieves a user by their email or phone.
+        :param identifier: The login identifier.
         :return: Dict containing user data or None if not found.
         """
         conn = self.get_connection()
         if not conn: return None
         try:
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM users WHERE username = %s AND is_active = TRUE", (username,))
+            query = "SELECT * FROM users WHERE (email = %s OR phone = %s) AND is_active = TRUE"
+            cursor.execute(query, (identifier, identifier))
             return cursor.fetchone()
         finally:
             conn.close()
 
-    def create_user(self, user_id, name, username, password_hash):
+    def create_user(self, user_id, name, password_hash, email=None, phone=None, registration_method='email'):
         """
         Creates a new user record in the database.
         :param user_id: Unique identifier for the user.
         :param name: Full name of the user.
-        :param username: Unique username for login.
         :param password_hash: PBKDF2 hashed password string.
+        :param email: Optional email address.
+        :param phone: Optional phone number.
+        :param registration_method: 'email' or 'phone'.
         """
         conn = self.get_connection()
         if not conn: return False
         try:
             cursor = conn.cursor()
-            query = "INSERT INTO users (id, name, username, password_hash) VALUES (%s, %s, %s, %s)"
-            cursor.execute(query, (user_id, name, username, password_hash))
+            query = "INSERT INTO users (id, name, password_hash, email, phone, registration_method) VALUES (%s, %s, %s, %s, %s, %s)"
+            cursor.execute(query, (user_id, name, password_hash, email, phone, registration_method))
             conn.commit()
             return True
         except Error as e:
             print(f"Error creating user: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def update_user(self, user_id, name=None, email=None, phone=None, profile_pic_path=None, currency_pref=None, default_account_id=None, password_hash=None):
+        """
+        Updates user profile information.
+        """
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            updates = []
+            params = []
+            if name:
+                updates.append("name = %s")
+                params.append(name)
+            if email:
+                updates.append("email = %s")
+                params.append(email)
+            if phone:
+                updates.append("phone = %s")
+                params.append(phone)
+            if profile_pic_path is not None:
+                updates.append("profile_pic_path = %s")
+                params.append(profile_pic_path)
+            if currency_pref:
+                updates.append("currency_pref = %s")
+                params.append(currency_pref)
+            if default_account_id:
+                updates.append("default_account_id = %s")
+                params.append(default_account_id)
+            if password_hash:
+                updates.append("password_hash = %s")
+                params.append(password_hash)
+
+            if not updates:
+                return True
+
+            query = f"UPDATE users SET {', '.join(updates)} WHERE id = %s"
+            params.append(user_id)
+            cursor.execute(query, tuple(params))
+            conn.commit()
+            return True
+        except Error as e:
+            print(f"Error updating user: {e}")
             return False
         finally:
             conn.close()
@@ -126,9 +175,9 @@ class DatabaseController:
         conn = self.get_connection()
         if not conn: return []
         try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT account_name FROM accounts WHERE user_id = %s AND is_active = TRUE ORDER BY display_order, account_name", (user_id,))
-            return [row[0] for row in cursor.fetchall()]
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT id, account_name, account_type FROM accounts WHERE user_id = %s AND is_active = TRUE ORDER BY display_order, account_name", (user_id,))
+            return cursor.fetchall()
         finally:
             conn.close()
 

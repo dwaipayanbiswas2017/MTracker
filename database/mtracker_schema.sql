@@ -18,13 +18,18 @@ USE m_tracker;
 CREATE TABLE users (
     id VARCHAR(50) PRIMARY KEY COMMENT 'Unique user ID (e.g., 1763904760.105118)',
     name VARCHAR(100) NOT NULL COMMENT 'Full name of the user',
-    username VARCHAR(50) NOT NULL UNIQUE COMMENT 'Login username (e.g., phone number)',
+    email VARCHAR(255) UNIQUE COMMENT 'Email address for communication',
+    phone VARCHAR(20) UNIQUE COMMENT 'Phone number for communication',
+    registration_method ENUM('email', 'phone') NOT NULL DEFAULT 'email' COMMENT 'Primary identifier used at registration',
     password_hash VARCHAR(255) NOT NULL COMMENT 'Hashed password (pbkdf2:sha256)',
+    profile_pic_path VARCHAR(500) COMMENT 'Path to the profile picture file',
+    currency_pref VARCHAR(10) DEFAULT 'INR' COMMENT 'User preferred currency',
+    default_account_id INT COMMENT 'Preferred default account ID',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
 
-    INDEX idx_username (username)
+    FOREIGN KEY (default_account_id) REFERENCES accounts(id) ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='User accounts and authentication';
 
 -- ============================================

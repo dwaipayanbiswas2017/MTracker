@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, jsonify, send_file, redirect,
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from database_controller import DatabaseController
 import dotenv
 import os
@@ -12,6 +13,8 @@ import os
 dotenv.load_dotenv()
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # Change this in production
+app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'profile_pics')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB limit
 
 # Database Configuration
 DB_CONFIG = {
@@ -33,17 +36,32 @@ login_manager.login_message = None # Disable default login message
 # --- User Management ---
 
 class User(UserMixin):
-    def __init__(self, id, name, username, password_hash):
+    def __init__(self, id, name, password_hash, email=None, phone=None, registration_method='email', profile_pic_path=None, currency_pref='INR', default_account_id=None):
         self.id = id
         self.name = name
-        self.username = username
         self.password_hash = password_hash
+        self.email = email
+        self.phone = phone
+        self.registration_method = registration_method
+        self.profile_pic_path = profile_pic_path
+        self.currency_pref = currency_pref
+        self.default_account_id = default_account_id
 
 @login_manager.user_loader
 def load_user(user_id):
     u = db.get_user_by_id(user_id)
     if u:
-        return User(user_id, u['name'], u['username'], u['password_hash'])
+        return User(
+            user_id,
+            u['name'],
+            u['password_hash'],
+            u.get('email'),
+            u.get('phone'),
+            u.get('registration_method', 'email'),
+            u.get('profile_pic_path'),
+            u.get('currency_pref', 'INR'),
+            u.get('default_account_id')
+        )
     return None
 
 # --- Data Management ---
@@ -82,35 +100,46 @@ def parse_month_date(date_str):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        identifier = request.form['username']
         password = request.form['password']
 
-        user_data = db.get_user_by_username(username)
+        user_data = db.get_user_by_identifier(identifier)
 
         if user_data and check_password_hash(user_data['password_hash'], password):
-            user = User(user_data['id'], user_data['name'], username, user_data['password_hash'])
+            user = User(
+                user_data['id'],
+                user_data['name'],
+                user_data['password_hash'],
+                user_data.get('email'),
+                user_data.get('phone'),
+                user_data.get('registration_method', 'email')
+            )
             login_user(user)
             return redirect(url_for('index'))
 
-        flash('Invalid username or password')
+        flash('Invalid Email/Phone or password')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         name = request.form['name']
-        username = request.form['username']
+        identifier = request.form['username']
         password = request.form['password']
 
-        if db.get_user_by_username(username):
-            flash('Username already exists')
+        if db.get_user_by_identifier(identifier):
+            flash('Email or Phone number already registered')
             return redirect(url_for('register'))
 
         user_id = str(datetime.now().timestamp())
         password_hash = generate_password_hash(password)
 
-        if db.create_user(user_id, name, username, password_hash):
-            user = User(user_id, name, username, password_hash)
+        email = identifier if '@' in identifier else None
+        phone = identifier if '@' not in identifier else None
+        reg_method = 'email' if '@' in identifier else 'phone'
+
+        if db.create_user(user_id, name, password_hash, email, phone, reg_method):
+            user = User(user_id, name, password_hash, email, phone, reg_method)
             login_user(user)
             return redirect(url_for('index'))
         else:
@@ -128,7 +157,7 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html', name=current_user.name)
+    return render_template('index.html', name=current_user.name, user=current_user)
 
 @app.route('/api/categories', methods=['GET'])
 @login_required
@@ -472,6 +501,61 @@ def delete_expense(month_id, expense_id):
     if db.delete_expense(current_user.id, month_id, expense_id):
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Could not delete expense"}), 500
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        currency_pref = request.form.get('currency_pref', 'INR')
+        default_account_id = request.form.get('default_account_id')
+
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        # Handle Profile Picture
+        profile_pic_path = current_user.profile_pic_path
+        if 'profile_pic' in request.files:
+            file = request.files['profile_pic']
+            if file and file.filename != '':
+                filename = secure_filename(f"{current_user.id}_{file.filename}")
+                # Ensure the path is relative to 'static/' for url_for
+                rel_path = os.path.join('uploads', 'profile_pics', filename)
+                full_path = os.path.join(app.root_path, 'static', rel_path)
+                file.save(full_path)
+                profile_pic_path = os.path.join('static', rel_path).replace('\\', '/')
+
+        password_hash = None
+        if new_password:
+            if not current_password or not check_password_hash(current_user.password_hash, current_password):
+                flash('Incorrect current password', 'danger')
+                return redirect(url_for('profile'))
+            if new_password != confirm_password:
+                flash('New passwords do not match', 'danger')
+                return redirect(url_for('profile'))
+            password_hash = generate_password_hash(new_password)
+
+        if db.update_user(
+            current_user.id,
+            name=name,
+            email=email,
+            phone=phone,
+            profile_pic_path=profile_pic_path,
+            currency_pref=currency_pref,
+            default_account_id=default_account_id if default_account_id else None,
+            password_hash=password_hash
+        ):
+            flash('Profile updated successfully', 'success')
+        else:
+            flash('Error updating profile', 'danger')
+
+        return redirect(url_for('profile'))
+
+    accounts = db.get_accounts(current_user.id)
+    return render_template('profile.html', user=current_user, accounts=accounts)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
