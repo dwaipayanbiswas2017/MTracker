@@ -1,90 +1,102 @@
 # MTracker
 
-MTracker is a personal finance management application designed to help you track your income, expenses, and budget across multiple bank accounts.
+MTracker is a professional personal finance management application designed to help you track your income, expenses, and budget across multiple bank accounts.
 
 ## Features
 
 -   **Multi-Account Support**: Track expenses and income for different accounts (e.g., Cash, Bank, Credit Card).
--   **Monthly Tracking**: Create and manage monthly budgets.
--   **Expense Categorization**: Categorize your expenses (e.g., Food, Bills, EMI).
--   **Long Pending Payments**: Track and manage long-term debts or payments.
--   **PDF Export**: Generate monthly statements in PDF format.
--   **CSV Import**: Import transaction data from CSV files.
--   **Dark/Light Mode**: Toggle between dark and light themes.
--   **User Authentication**: Secure login and registration system.
-
-## Updated Features
-
--   **Long Pending Payments**: Track long-term debts, make partial payments, and link them to monthly expenses.
--   **Month Auto-Creation**: Automatically create a new month with balances carried forward from the previous month.
--   **CSV Import**: Enhanced parsing logic for importing transactions, including income, expenses, and pending payments.
--   **Expense Deletion**: Delete expenses and reverse linked long-pending payments.
+-   **Monthly Tracking**: Create and manage monthly budgets and transactions.
+-   **Expense Categorization**: Categorize your expenses (e.g., Food, Bills, EMI) with full CRUD support.
+-   **Long Pending Payments**: Track and manage long-term debts with partial payment support linked to monthly cycles.
+-   **CSV Import**: Batch import transaction data from CSV files for rapid entry.
+-   **PDF Export**: Generate professional monthly statements in PDF format with automatic charts.
+-   **Profile Management**: Update profile pictures, manage contact info with OTP verification, and set currency/account preferences.
+-   **Admin Panel**: System-wide oversight, user management (activate/deactivate/promote), and global statistics.
+-   **Modern Dynamic UI**: Clean, tactile interface with a consistent theme engine supporting Light and Dark modes.
+-   **Secure Authentication**: Role-based access control with secure password hashing and dual-identifier (Email/Phone) login.
 
 ## API Endpoints
 
 ### Authentication
--   **`/login`**: Login route (GET/POST).
--   **`/register`**: Register route (GET/POST).
--   **`/logout`**: Logout route (GET).
+-   **`/login`**: Secure login (GET/POST).
+-   **`/register`**: New user registration (GET/POST).
+-   **`/logout`**: Session termination (GET).
+-   **`/api/verify_password`**: Internal identity verification (POST).
+-   **`/api/send_otp`**: OTP generation for contact updates or security (POST).
+-   **`/api/verify_otp`**: OTP verification for sensitive profile changes (POST).
 
-### Categories
--   **`/api/categories`**: Get all categories (GET).
--   **`/api/categories`**: Add a new category (POST).
+### Dashboard & Data
+-   **`/api/categories`**: CRUD operations for user categories (GET/POST).
+-   **`/api/categories/update`**: Rename existing categories (POST).
+-   **`/api/accounts`**: CRUD operations for user bank accounts (GET/POST).
+-   **`/api/accounts/update`**: Rename existing accounts (POST).
+-   **`/api/months`**: Retrieve list of managed months (GET).
+-   **`/api/month/<month_id>`**: Comprehensive month-over-month data retrieval (GET).
+-   **`/api/save`**: Persistent storage for monthly transaction blocks (POST).
+-   **`/api/create_month`**: Scaffolding for new monthly cycles (POST).
+-   **`/api/delete_month`**: Complete removal of a monthly cycle (POST).
 
-### Accounts
--   **`/api/accounts`**: Get all accounts (GET).
--   **`/api/accounts`**: Add a new account (POST).
+### Transactions & Payments
+-   **`/api/import`**: Bulk ingestion from external CSV sources (POST).
+-   **`/api/month/<month_id>/expense/<expense_id>`**: Targeted transaction deletion (DELETE).
+-   **`/api/long_pending`**: High-level debt overview (GET/POST).
+-   **`/api/long_pending/<item_id>`**: Remove a debt track (DELETE).
+-   **`/api/long_pending/<item_id>/partial_payment`**: Record partial debt clearances (POST).
 
-### Months
--   **`/api/months`**: Get all months (GET).
--   **`/api/month/<month_id>`**: Get data for a specific month (GET).
--   **`/api/create_month`**: Create a new month (POST).
--   **`/api/delete_month`**: Delete a month (POST).
-
-### Transactions
--   **`/api/save`**: Save data for a specific month (POST).
--   **`/api/import`**: Import transactions from a CSV file (POST).
--   **`/api/month/<month_id>/expense/<expense_id>`**: Delete an expense (DELETE).
-
-### Long Pending Payments
--   **`/api/long_pending`**: Get all long-pending payments (GET).
--   **`/api/long_pending`**: Add a new long-pending payment (POST).
--   **`/api/long_pending/<item_id>`**: Delete a long-pending payment (DELETE).
--   **`/api/long_pending/<item_id>/partial_payment`**: Make a partial payment for a long-pending item (POST).
+### Administration
+-   **`/admin`**: Global dashboard overview for system administrators (GET).
+-   **`/admin/toggle_user/<user_id>`**: Enable/Disable system access (POST).
+-   **`/admin/toggle_admin/<user_id>`**: Promote/Demote administrative rights (POST).
+-   **`/admin/delete_user/<user_id>`**: Permanent cascading deletion of user data (POST).
 
 ## Tech Stack
 
--   **Backend**: Python, Flask
--   **Frontend**: HTML, Tailwind CSS, jQuery
--   **Data Storage**: JSON files (per user)
+-   **Backend**: Python 3.x, Flask (Web Framework)
+-   **Frontend**: HTML5, Tailwind CSS (Styling), jQuery (AJAX & DOM), Lucide (Icons)
+-   **Database**: MySQL 8.0+ (Transactions, Users, Persistent State)
+-   **Authentication**: Flask-Login, Werkzeug (Security)
 
 ## Setup & Installation
 
-1.  **Clone the repository** (or download the source code).
-2.  **Install dependencies**:
+1.  **Clone the repository**:
     ```bash
-    pip install flask flask-login
+    git clone https://github.com/dwaipayanbiswas2017/MTracker.git
+    cd MTracker
     ```
-3.  **Create necessary directories and files**:
+
+2.  **Initialize Environment**:
+    Create a `.env` file in the root directory with the following variables:
+    ```env
+    host=localhost
+    user=your_db_user
+    password=your_db_password
+    database=mtracker
+    ```
+
+3.  **Install dependencies**:
     ```bash
-    mkdir data
-    echo {} > users.json
+    pip install -r requirements.txt
     ```
-4.  **Run the application**:
+
+4.  **Database Setup**:
+    Initialize your MySQL database using the schema provided in `database/mtracker_schema.sql`.
+
+5.  **Run the application**:
     ```bash
     python app.py
     ```
-5.  **Access the app**:
-    Open your browser and go to `http://localhost:5000`.
+
+6.  **Access the Registry**:
+    Visit `http://localhost:5000` to register your first administrative or user account.
 
 ## Usage
 
-1.  **Register/Login**: Create an account to start tracking.
-2.  **Create a Month**: Start a new month to begin tracking transactions.
-3.  **Add Accounts**: Go to "Manage Accounts" to add your bank accounts.
-4.  **Add Transactions**: Record income, paid expenses, and personal expenses.
-5.  **View Reports**: Check the dashboard for real-time balance updates or export a PDF report.
+1.  **Register/Login**: Start by creating an account. The first registered user can be manually promoted to admin via the database if needed.
+2.  **Initialize Months**: Create a "New Month" to start tracking. Balances are automatically calculated and carried forward.
+3.  **Configure Accounts**: Add your bank accounts or physical wallets in the "Accounts" section.
+4.  **Manage Transactions**: Use the dashboard to record income, expenses, and track pending items.
+5.  **Analyze & Export**: Use the built-in charts for visual analysis or export a professional PDF report for your records.
 
 ## License
 
-This project is for personal use.
+This project is for private use only. All rights reserved. &copy; 2026 MTracker Systems.
