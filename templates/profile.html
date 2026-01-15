@@ -1,9 +1,17 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - MTracker</title>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,73 +36,185 @@
 
     <style>
         :root {
-            --bg-color: #f1f5f9;
+            --bg-color: #f8fafc;
             --text-color: #0f172a;
             --card-bg: #ffffff;
             --input-bg: #ffffff;
             --input-border: #cbd5e1;
             --input-text: #0f172a;
             --border-color: #e2e8f0;
+            --accent-color: #2563eb;
         }
 
         .dark {
             --bg-color: #0f172a;
-            --text-color: #f8fafc;
+            --text-color: #f1f5f9;
             --card-bg: #1e293b;
-            --input-bg: #334155;
-            --input-border: #475569;
-            --input-text: #f8fafc;
+            --input-bg: #1e293b;
+            --input-border: #334155;
+            --input-text: #f1f5f9;
             --border-color: #334155;
+            --accent-color: #3b82f6;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
         }
 
         .card {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
 
         .input-field {
             background-color: var(--input-bg);
             border: 1px solid var(--input-border);
             color: var(--input-text);
-            padding: 0.625rem;
+            padding: 0.75rem;
             border-radius: 0.5rem;
             width: 100%;
             outline: none;
+            transition: all 0.2s;
         }
 
         .input-field:focus {
-            border-color: #2563eb;
-            ring: 2px solid #2563eb;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
     </style>
 </head>
 <body class="p-4 md:p-6 pb-20">
 
     <!-- Header -->
-    <div class="mb-8">
+    <div class="mb-8 max-w-7xl mx-auto">
         <div class="flex justify-between items-center">
             <div class="flex items-center gap-2">
-                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                    <i data-lucide="wallet"></i>
-                </div>
+                <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
                 <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
             </div>
 
-            <div class="flex gap-2 items-center">
-                <button id="theme-toggle" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded h-10 transition-colors" title="Toggle Theme">
+            <div class="hidden md:flex gap-2 items-center">
+                <a href="{{ url_for('index') }}" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+
+                <button id="theme-toggle" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="Toggle Theme">
                     <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
                 </button>
-                <a href="{{ url_for('index') }}" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors">
-                    <i data-lucide="home" class="w-4 h-4"></i>
-                    <span class="font-medium">Home</span>
-                </a>
+
+                <!-- Profile Dropdown -->
+                <div class="relative" id="profile-dropdown-container">
+                    <button onclick="toggleProfileDropdown(event)" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-2 py-1 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500"
+                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500">
+                        {% endif %}
+                        <span class="font-medium mr-1">{{ current_user.name.split(' ')[0] if current_user.name else 'User' }}</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 opacity-50"></i>
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-500"></i>
+                            Dashboard
+                        </a>
+                        {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-orange-500"></i>
+                            Admin Panel
+                        </a>
+                        {% endif %}
+                        <div class="border-t border-slate-200 dark:border-slate-700 my-1"></div>
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Actions -->
+            <div class="flex md:hidden gap-2 items-center">
+                <button id="theme-toggle-mobile" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white p-2.5 rounded transition-colors border border-slate-300 dark:border-slate-600 shadow-sm" title="Toggle Theme">
+                    <i id="theme-icon-mobile" data-lucide="sun" class="w-5 h-5"></i>
+                </button>
+                <div class="relative">
+                    <button onclick="toggleProfileDropdownMobile(event)" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded transition-colors border border-blue-500">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-8 h-8 rounded-full object-cover"
+                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                                 class="w-8 h-8 rounded-full object-cover">
+                        {% endif %}
+                    </button>
+                    <!-- Mobile Dropdown Menu -->
+                    <div id="profile-dropdown-menu-mobile" class="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-500"></i>
+                            Dashboard
+                        </a>
+                        {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-orange-500"></i>
+                            Admin
+                        </a>
+                        {% endif %}
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -116,7 +236,7 @@
                 {% endif %}
             {% endwith %}
 
-            <form action="{{ url_for('profile') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            <form id="profile-form" action="{{ url_for('profile') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
                 <!-- Profile Pic -->
                 <div class="flex flex-col items-center">
                     <div class="relative group">
@@ -133,37 +253,68 @@
                         </label>
                         <input type="file" id="profile_pic" name="profile_pic" class="hidden" accept="image/*" onchange="previewImage(this)">
                     </div>
-                    <p class="text-sm text-slate-400 mt-2">Click to change profile picture</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">Click to change profile picture</p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-slate-400">Full Name</label>
-                        <input type="text" name="name" value="{{ user.name }}" class="input-field" required>
+                        <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Full Name</label>
+                        <input type="text" name="name" value="{{ user.name }}" data-initial="{{ user.name }}" class="input-field dirty-check" required>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-slate-400">Email Address</label>
-                        <input type="email" name="email" value="{{ user.email or '' }}"
-                               class="input-field {% if user.registration_method == 'email' %}opacity-60 cursor-not-allowed{% endif %}"
-                               placeholder="your@email.com"
-                               {% if user.registration_method == 'email' %}disabled title="Registered email cannot be changed"{% endif %}>
+                        <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Email Address (Requires Verification)</label>
+                        <div class="relative group">
+                            <input type="email" id="email-field" name="email" value="{{ user.email or '' }}"
+                                   data-initial="{{ user.email or '' }}"
+                                   class="input-field dirty-check pr-20"
+                                   placeholder="your@email.com">
+                            <button type="button" id="verify-email-btn" onclick="startUpdateVerification('email')"
+                                    class="hidden absolute right-2 top-1.5 bg-blue-600 text-[10px] text-white font-bold py-1.5 px-2 rounded hover:bg-blue-700 transition-all shadow-sm active:translate-y-0.5">
+                                Update
+                            </button>
+                        </div>
                     </div>
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-slate-400">Phone Number</label>
-                        <input type="text" name="phone" value="{{ user.phone or '' }}"
-                               class="input-field {% if user.registration_method == 'phone' %}opacity-60 cursor-not-allowed{% endif %}"
-                               placeholder="Enter phone number"
-                               {% if user.registration_method == 'phone' %}disabled title="Registered phone cannot be changed"{% endif %}>
+                        <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Phone Number (Requires Verification)</label>
+                        <div class="relative group">
+                            <input type="text" id="phone-field" name="phone" value="{{ user.phone or '' }}"
+                                   data-initial="{{ user.phone or '' }}"
+                                   class="input-field dirty-check pr-20"
+                                   placeholder="Enter phone number">
+                            <button type="button" id="verify-phone-btn" onclick="startUpdateVerification('phone')"
+                                    class="hidden absolute right-2 top-1.5 bg-blue-600 text-[10px] text-white font-bold py-1.5 px-2 rounded hover:bg-blue-700 transition-all shadow-sm active:translate-y-0.5">
+                                Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OTP Modal for Email/Phone Update -->
+                <div id="update-otp-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-4">
+                    <div class="card w-full max-w-sm p-6 space-y-4 shadow-2xl scale-95 transition-transform" id="otp-modal-content">
+                        <div class="text-center">
+                            <div class="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i data-lucide="shield-check"></i>
+                            </div>
+                            <h3 class="text-lg font-bold">Verify Identity</h3>
+                            <p id="update-otp-text" class="text-xs text-slate-600 dark:text-slate-400 mt-1">An OTP has been sent to your new contact entry.</p>
+                        </div>
+                        <input type="text" id="update-otp-input" class="input-field text-center tracking-[0.5em] font-bold text-lg" placeholder="000000" maxlength="6">
+                        <p id="update-otp-error" class="hidden text-xs text-rose-500 text-center"></p>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="closeUpdateOTP()" class="flex-1 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-bold py-2 rounded border border-slate-300 dark:border-slate-500 shadow-sm active:translate-y-0.5">Cancel</button>
+                            <button type="button" onclick="submitUpdateOTP()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded shadow-md active:translate-y-0.5">Verify</button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-slate-400">Preferred Currency</label>
-                        <select name="currency_pref" class="input-field">
+                        <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Preferred Currency</label>
+                        <select name="currency_pref" data-initial="{{ user.currency_pref }}" class="input-field dirty-check">
                             <option value="INR" {% if user.currency_pref == 'INR' %}selected{% endif %}>INR (₹)</option>
                             <option value="USD" {% if user.currency_pref == 'USD' %}selected{% endif %}>USD ($)</option>
                             <option value="EUR" {% if user.currency_pref == 'EUR' %}selected{% endif %}>EUR (€)</option>
@@ -171,8 +322,8 @@
                         </select>
                     </div>
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-slate-400">Default Account</label>
-                        <select name="default_account_id" class="input-field">
+                        <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Default Account</label>
+                        <select name="default_account_id" data-initial="{{ user.default_account_id }}" class="input-field dirty-check">
                             <option value="">Select an account</option>
                             {% for acc in accounts %}
                             <option value="{{ acc.id }}" {% if user.default_account_id == acc.id %}selected{% endif %}>{{ acc.account_name }}</option>
@@ -181,31 +332,101 @@
                     </div>
                 </div>
 
-                <div class="pt-4 border-t border-slate-700">
-                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-                        <i data-lucide="lock" class="text-orange-500"></i>
-                        Change Password
-                    </h3>
-                    <div class="space-y-4">
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-slate-400">Current Password</label>
-                            <input type="password" name="current_password" class="input-field" placeholder="Required for password change">
+                <!-- Password Section Carousel -->
+                <div class="pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <button type="button" id="toggle-password-btn" class="w-full flex justify-between items-center py-3 px-4 bg-white dark:bg-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-all group border border-slate-200 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="lock" class="text-orange-500"></i>
+                            <span class="font-bold">Change Password</span>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <i data-lucide="chevron-down" id="pwd-chevron" class="text-slate-500 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-white transition-transform"></i>
+                    </button>
+
+                    <div id="password-carousel" class="hidden mt-4 space-y-6 overflow-hidden transition-all duration-300">
+                        <!-- Step 1: Selection -->
+                        <div id="pwd-step-1" class="space-y-4">
+                            <p class="text-sm text-slate-500 dark:text-slate-400 text-center">To change your password, we need to verify your identity.</p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <button type="button" onclick="goToStep('password')" class="p-6 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800/50 hover:bg-blue-600/10 hover:border-blue-500 transition-all text-center group shadow-sm active:translate-y-0.5">
+                                    <i data-lucide="key" class="w-10 h-10 mx-auto mb-3 text-slate-500 dark:text-slate-400 group-hover:text-blue-500"></i>
+                                    <h4 class="font-bold">Use Password</h4>
+                                    <p class="text-[10px] text-slate-600 dark:text-slate-500">Verify with your current password</p>
+                                </button>
+                                <button type="button" onclick="goToStep('otp')" class="p-6 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800/50 hover:bg-blue-600/10 hover:border-blue-500 transition-all text-center group shadow-sm active:translate-y-0.5">
+                                    <i data-lucide="smartphone" class="w-10 h-10 mx-auto mb-3 text-slate-500 dark:text-slate-400 group-hover:text-blue-500"></i>
+                                    <h4 class="font-bold">Use OTP</h4>
+                                    <p class="text-[10px] text-slate-600 dark:text-slate-500">Verify via Email & SMS</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2a: Current Password Verification -->
+                        <div id="pwd-step-2a" class="hidden space-y-4">
                             <div class="space-y-2">
-                                <label class="text-sm font-medium text-slate-400">New Password</label>
-                                <input type="password" name="new_password" class="input-field" placeholder="Minimum 6 characters">
+                                <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Current Password</label>
+                                <div class="flex gap-2">
+                                    <input type="password" id="verify_current_pwd" class="input-field" placeholder="Enter current password" onkeydown="if(event.key === 'Enter') { event.preventDefault(); verifyCurrentPassword(); }">
+                                    <button type="button" onclick="verifyCurrentPassword()" class="bg-blue-600 px-6 rounded-lg text-white font-bold hover:bg-blue-700 shadow-md active:translate-y-0.5">Verify</button>
+                                </div>
+                                <p id="pwd-error" class="hidden text-xs text-rose-500 mt-1"></p>
+                            </div>
+                        </div>
+
+                        <!-- Step 2b: OTP Verification -->
+                        <div id="pwd-step-2b" class="hidden space-y-4">
+                            <div class="text-center mb-2">
+                                <p id="otp-sent-to" class="text-xs text-slate-600 dark:text-slate-400"></p>
                             </div>
                             <div class="space-y-2">
-                                <label class="text-sm font-medium text-slate-400">Confirm New Password</label>
-                                <input type="password" name="confirm_password" class="input-field" placeholder="Repeat new password">
+                                <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Enter OTP</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="verify_otp_input" class="input-field text-center tracking-[0.5em] font-bold" placeholder="000000" maxlength="6" onkeydown="if(event.key === 'Enter') { event.preventDefault(); verifyOTP(); }">
+                                    <button type="button" onclick="verifyOTP()" class="bg-blue-600 px-6 rounded-lg text-white font-bold hover:bg-blue-700 shadow-md active:translate-y-0.5">Verify</button>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <p id="otp-error" class="hidden text-xs text-rose-500 mt-1"></p>
+                                    <button type="button" onclick="goToStep('otp')" class="text-[10px] text-blue-500 hover:underline">Resend OTP</button>
+                                </div>
                             </div>
+                        </div>
+
+                        <!-- Step 3: New Password Inputs -->
+                        <div id="pwd-step-3" class="hidden space-y-4 bg-blue-50 dark:bg-blue-500/5 p-4 rounded-xl border border-blue-200 dark:border-blue-500/20">
+                            <div class="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-500">
+                                <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                <span class="text-xs font-bold uppercase tracking-wider">Verification Successful</span>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium text-slate-600 dark:text-slate-400">New Password</label>
+                                    <input type="password" id="new_password" class="input-field" placeholder="Minimum 6 characters">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium text-slate-600 dark:text-slate-400">Confirm New Password</label>
+                                    <input type="password" id="confirm_password" class="input-field" placeholder="Repeat new password">
+                                </div>
+                            </div>
+
+                            <div class="flex justify-center pt-2">
+                                <button type="button" onclick="submitPasswordChange()" class="btn-primary w-full md:w-auto">
+                                    <i data-lucide="key" class="w-4 h-4"></i>
+                                    Update Password Only
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="reset-pwd-steps" class="hidden pt-4 text-center">
+                            <button type="button" onclick="resetSteps()" class="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white flex items-center gap-1 mx-auto bg-white dark:bg-slate-700/50 px-3 py-1.5 rounded-full transition-all border border-slate-200 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                                <i data-lucide="arrow-left" class="w-3 h-3"></i>
+                                Back to validation methods
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <div class="flex justify-end pt-4">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:shadow-blue-500/20 transition-all flex items-center gap-2">
+                    <button type="submit" id="save-profile-btn" disabled class="btn-primary px-8 shadow-md">
                         <i data-lucide="save" class="w-5 h-5"></i>
                         Save Profile
                     </button>
@@ -215,36 +436,42 @@
     </div>
 
     <!-- Footer -->
-    <footer class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 text-slate-400 text-sm">
-        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            <div class="space-y-4">
-                <div class="flex items-center gap-2 text-slate-200">
-                    <div class="w-6 h-6 bg-blue-600 rounded flex items-center justify-center text-xs">
-                        <i data-lucide="wallet" class="w-4 h-4"></i>
+    <footer class="mt-12 pt-10 border-t border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm max-w-6xl mx-auto px-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+            <div class="col-span-1 md:col-span-2 space-y-4">
+                <div class="flex items-center gap-2 text-slate-900 dark:text-slate-200">
+                    <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                        <i data-lucide="wallet" class="w-5 h-5"></i>
                     </div>
-                    <span class="font-bold">MTracker</span>
+                    <span class="font-bold text-lg">MTracker</span>
                 </div>
-                <p>Your personal expense and finance tracker. Simple, secure, and smart.</p>
+                <p class="max-w-md">The modern approach to managing your personal finances. Track every penny, analyze your spending, and achieve your financial goals with ease.</p>
+                <div class="flex gap-4">
+                    <a href="https://github.com/dwaipayanbiswas2017/MTracker" target="_blank" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white" title="GitHub Repository">
+                        <i data-lucide="github" class="w-5 h-5"></i>
+                    </a>
+                    <a href="mailto:support@mtracker.com" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white" title="Contact Support">
+                        <i data-lucide="mail" class="w-5 h-5"></i>
+                    </a>
+                </div>
             </div>
             <div>
-                <h4 class="font-bold text-slate-200 mb-4 uppercase text-xs tracking-widest">Quick Links</h4>
-                <ul class="space-y-2">
-                    <li><a href="{{ url_for('index') }}" class="hover:text-blue-500 transition-colors">Dashboard</a></li>
-                    <li><a href="{{ url_for('profile') }}" class="hover:text-blue-500 transition-colors">Profile Settings</a></li>
-                    <li><a href="#" class="hover:text-blue-500 transition-colors">Usage Guide</a></li>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Navigation</h4>
+                <ul class="space-y-3">
+                    <li><a href="{{ url_for('index') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard</a></li>
+                    <li><a href="{{ url_for('profile') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="user-cog" class="w-4 h-4"></i> Profile Settings</a></li>
                 </ul>
             </div>
             <div>
-                <h4 class="font-bold text-slate-200 mb-4 uppercase text-xs tracking-widest">Support</h4>
-                <p>Found a bug or need help? Check our GitHub repository or contact support.</p>
-                <div class="flex gap-4 mt-4 text-slate-200">
-                    <a href="https://github.com/dwaipayanbiswas2017/MTracker" target="_blank" class="hover:text-blue-500"><i data-lucide="github"></i></a>
-                    <a href="mailto:support@mtracker.com" class="hover:text-blue-500"><i data-lucide="mail"></i></a>
-                </div>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Resources</h4>
+                <ul class="space-y-3">
+                    <li><a href="#" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> Documentation</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Privacy Policy</a></li>
+                </ul>
             </div>
         </div>
-        <div class="text-center pb-8 opacity-50">
-            &copy; 2026 MTracker Systems. Built for private financial tracking.
+        <div class="text-center py-6 border-t border-slate-200 dark:border-slate-800 opacity-60">
+            &copy; 2026 MTracker Systems. All rights reserved. Built for private financial tracking.
         </div>
     </footer>
 
@@ -258,25 +485,236 @@
                     $('#preview').attr('src', e.target.result);
                 }
                 reader.readAsDataURL(input.files[0]);
+                checkDirtiness();
             }
+        }
+
+        // --- Dirtiness Check ---
+        function checkDirtiness() {
+            let isDirty = false;
+            $('.dirty-check').each(function() {
+                const initial = $(this).attr('data-initial') || '';
+                const current = $(this).val();
+                if (current != initial) {
+                    isDirty = true;
+                }
+            });
+
+            // Check if profile pic file exists
+            if ($('#profile_pic')[0].files.length > 0) {
+                isDirty = true;
+            }
+
+            $('#save-profile-btn').prop('disabled', !isDirty);
+
+            // Toggle Update buttons for Email/Phone
+            const emailIn = $('#email-field');
+            $('#verify-email-btn').toggleClass('hidden', emailIn.val() == emailIn.attr('data-initial') || emailIn.val() == '');
+
+            const phoneIn = $('#phone-field');
+            $('#verify-phone-btn').toggleClass('hidden', phoneIn.val() == phoneIn.attr('data-initial') || phoneIn.val() == '');
+        }
+
+        $('.dirty-check').on('input change', checkDirtiness);
+
+        // --- Email/Phone Update Logic ---
+        let currentUpdateType = '';
+        let currentUpdateValue = '';
+
+        function startUpdateVerification(type) {
+            currentUpdateType = type;
+            currentUpdateValue = $(`#${type}-field`).val();
+
+            $.ajax({
+                url: '/api/send_otp',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ identifier: currentUpdateValue }),
+                success: function(res) {
+                    $('#update-otp-text').text(`An OTP has been sent to ${currentUpdateValue} for verification.`);
+                    $('#update-otp-modal').removeClass('hidden').addClass('flex');
+                    $('#otp-modal-content').removeClass('scale-95').addClass('scale-100');
+                    $('#update-otp-error').hide();
+                },
+                error: function(err) {
+                    alert(err.responseJSON.message || 'Error sending OTP');
+                }
+            });
+        }
+
+        function closeUpdateOTP() {
+            $('#update-otp-modal').addClass('hidden').removeClass('flex');
+            $('#update-otp-input').val('');
+        }
+
+        function submitUpdateOTP() {
+            const otpCode = $('#update-otp-input').val();
+            if (!otpCode) return;
+
+            $.ajax({
+                url: '/api/verify_otp',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ otp: otpCode }),
+                success: function(res) {
+                    if (res.type == 'identifier_update') {
+                        // Success update in DB, reload to show new data-initial
+                        location.reload();
+                    }
+                },
+                error: function(err) {
+                    $('#update-otp-error').text(err.responseJSON.message || 'Invalid OTP').show();
+                }
+            });
+        }
+
+        // --- Password Logic ---
+        function submitPasswordChange() {
+            const newPwd = $('#new_password').val();
+            const confPwd = $('#confirm_password').val();
+            const curPwd = $('#hidden_current_password').val();
+
+            if (!newPwd || newPwd.length < 6) {
+                alert('Password must be at least 6 characters.');
+                return;
+            }
+
+            $.post('/api/update_password', {
+                current_password: curPwd,
+                new_password: newPwd,
+                confirm_password: confPwd
+            }, function(res) {
+                if (res.status === 'success') {
+                    alert('Password changed successfully!');
+                    resetSteps();
+                    $('#toggle-password-btn').click(); // Close
+                } else {
+                    alert(res.message);
+                }
+            }).fail(err => alert(err.responseJSON.message || 'Error updating password'));
         }
 
         // Theme Logic
         function toggleTheme() {
             const html = $('html');
+            const icons = $('#theme-icon, #theme-icon-mobile');
             if (html.hasClass('dark')) {
                 html.removeClass('dark');
                 localStorage.setItem('theme', 'light');
-                $('#theme-icon').attr('data-lucide', 'sun');
+                icons.attr('data-lucide', 'sun');
             } else {
                 html.addClass('dark');
                 localStorage.setItem('theme', 'dark');
-                $('#theme-icon').attr('data-lucide', 'moon');
+                icons.attr('data-lucide', 'moon');
             }
             lucide.createIcons();
         }
 
-        $('#theme-toggle').click(toggleTheme);
+        $('#theme-toggle, #theme-toggle-mobile').click(toggleTheme);
+
+        function toggleProfileDropdown(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu').toggleClass('hidden');
+        }
+
+        function toggleProfileDropdownMobile(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu-mobile').toggleClass('hidden');
+        }
+
+        $(document).click(function() {
+            $('#profile-dropdown-menu').addClass('hidden');
+            $('#profile-dropdown-menu-mobile').addClass('hidden');
+        });
+
+        // Password Carousel Logic
+        $('#toggle-password-btn').click(function() {
+            const carousel = $('#password-carousel');
+            const chevron = $('#pwd-chevron');
+            if (carousel.hasClass('hidden')) {
+                carousel.removeClass('hidden');
+                chevron.css('transform', 'rotate(180deg)');
+            } else {
+                carousel.addClass('hidden');
+                chevron.css('transform', 'rotate(0deg)');
+            }
+        });
+
+        function resetSteps() {
+            $('#pwd-step-1').show();
+            $('#pwd-step-2a, #pwd-step-2b, #pwd-step-3, #reset-pwd-steps').hide();
+            $('#verify_current_pwd, #verify_otp_input, #new_password, #confirm_password').val('');
+            $('#hidden_current_password').val('');
+        }
+
+        function goToStep(method) {
+            $('#pwd-step-1').hide();
+            $('#reset-pwd-steps').show();
+            if (method === 'password') {
+                $('#pwd-step-2a').show();
+            } else if (method === 'otp') {
+                sendOTP();
+            }
+        }
+
+        function sendOTP() {
+            $('#pwd-step-2b').show();
+            $('#otp-sent-to').text('Sending OTP...');
+            $.ajax({
+                url: '/api/send_otp',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({}),
+                success: function(res) {
+                    $('#otp-sent-to').text(`OTP sent successfully to your ${res.target}`);
+                },
+                error: function(err) {
+                    $('#otp-sent-to').text('');
+                    $('#otp-error').text(err.responseJSON.message || 'Error sending OTP').show();
+                }
+            });
+        }
+
+        function verifyCurrentPassword() {
+            const pwd = $('#verify_current_pwd').val();
+            if(!pwd) return;
+
+            $.ajax({
+                url: '/api/verify_password',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ password: pwd }),
+                success: function(res) {
+                    $('#pwd-step-2a').hide();
+                    $('#pwd-step-3').show();
+                    $('#hidden_current_password').val(pwd);
+                    $('#pwd-error').hide();
+                },
+                error: function(err) {
+                    $('#pwd-error').text(err.responseJSON.message || 'Verification failed').show();
+                }
+            });
+        }
+
+        function verifyOTP() {
+            const otpValue = $('#verify_otp_input').val();
+            if(!otpValue) return;
+
+            $.ajax({
+                url: '/api/verify_otp',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ otp: otpValue }),
+                success: function(res) {
+                    $('#pwd-step-2b').hide();
+                    $('#pwd-step-3').show();
+                    $('#otp-error').hide();
+                },
+                error: function(err) {
+                    $('#otp-error').text(err.responseJSON.message || 'Invalid OTP').show();
+                }
+            });
+        }
 
         // Initialize Theme
         if (localStorage.getItem('theme') === 'light') {
@@ -284,6 +722,9 @@
             $('#theme-icon').attr('data-lucide', 'sun');
             lucide.createIcons();
         }
+
+        // Final Init
+        checkDirtiness();
     </script>
 </body>
 </html>

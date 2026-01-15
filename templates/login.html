@@ -1,9 +1,18 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Expense Manager</title>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -20,53 +29,100 @@
         }
     </script>
     <style>
-        body { background-color: #0f172a; color: #f8fafc; }
+        :root {
+            --bg-color: #f8fafc;
+            --text-color: #0f172a;
+            --card-bg: #ffffff;
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-text: #0f172a;
+            --border-color: #e2e8f0;
+        }
+
+        .dark {
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+            --card-bg: #1e293b;
+            --input-bg: #1e293b;
+            --input-border: #334155;
+            --input-text: #f1f5f9;
+            --border-color: #334155;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        .input-field {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--input-text);
+            padding: 0.625rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
     </style>
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="flex flex-col min-h-screen items-center justify-center p-4">
-    <div class="w-full max-w-md p-4 md:p-8 space-y-6 bg-slate-800 rounded-lg shadow-lg border border-slate-700 my-auto">
+    <div class="w-full max-w-md p-6 md:p-8 space-y-6 card my-auto">
         <div class="flex items-center gap-2 justify-center mb-6">
             <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
-            <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">M<span class="text-blue-500">Tracker</span></h1>
         </div>
-        <h1 class="text-2xl font-bold text-center">Login</h1>
+        <h1 class="text-xl font-bold text-center text-slate-800 dark:text-white">Sign In</h1>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div class="bg-red-500/20 text-red-300 p-3 rounded text-sm">
+                <div class="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 p-3 rounded-lg text-sm text-center">
                     {{ messages[0] }}
                 </div>
             {% endif %}
         {% endwith %}
         <form action="/login" method="POST" class="space-y-4">
-            <!-- <div>
-                <label class="block text-sm font-medium text-slate-400">Name</label>
-                <input type="text" name="name" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500">
-            </div> -->
             <div>
-                <label class="block text-sm font-medium text-slate-400">Username</label>
-                <input type="text" name="username" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500" placeholder="Enter Email or Phone number">
+                <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Email or Phone</label>
+                <input type="text" name="username" required class="input-field" placeholder="Enter Email or Phone number">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-400">Password</label>
-                <input type="password" name="password" required class="w-full p-2 mt-1 bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500" placeholder="Enter password">
+                <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Password</label>
+                <input type="password" name="password" required class="input-field" placeholder="Enter password">
             </div>
-            <button type="submit" class="w-full py-2 font-bold text-white bg-blue-600 rounded hover:bg-blue-500">Login</button>
+            <button type="submit" class="w-full py-3 font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:translate-y-0.5 transition-all">
+                Login
+            </button>
         </form>
-        <p class="text-sm text-center text-slate-400">
-            Don't have an account? <a href="/register" class="text-blue-400 hover:underline">Register</a>
+        <p class="text-sm text-center text-slate-500 dark:text-slate-400">
+            Don't have an account? <a href="/register" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline">Create account</a>
         </p>
     </div>
 
     <!-- Footer -->
-    <footer class="mt-8 py-6 text-slate-500 text-xs text-center w-full">
-        <div class="flex justify-center gap-6 mb-3">
-            <a href="#" class="hover:text-blue-400 transition-colors">Privacy Policy</a>
-            <a href="#" class="hover:text-blue-400 transition-colors">Terms of Service</a>
-            <a href="mailto:support@mtracker.com" class="hover:text-blue-400 transition-colors">Support</a>
+    <footer class="mt-auto py-8 text-slate-500 dark:text-slate-400 text-sm text-center w-full border-t border-slate-200 dark:border-slate-800 opacity-80">
+        <div class="max-w-md mx-auto space-y-4">
+            <div class="flex justify-center gap-6">
+                <a href="#" class="hover:text-blue-500 transition-colors">Privacy Policy</a>
+                <a href="#" class="hover:text-blue-500 transition-colors">Terms of Service</a>
+                <a href="mailto:support@mtracker.com" class="hover:text-blue-500 transition-colors">Support</a>
+            </div>
+            <p>&copy; 2026 MTracker Systems. Built for private financial tracking.</p>
         </div>
-        <p>&copy; 2026 MTracker Systems. Secure Personalized Finance Tracking.</p>
     </footer>
 
     <script>

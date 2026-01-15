@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - MTracker</title>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        brand: '#2563eb',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- JQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-color: #0f172a;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --accent-color: #2563eb;
+        }
+
+        .dark {
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --accent-color: #3b82f6;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: sans-serif;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 1rem;
+            font-size: 0.875rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 pb-20">
+
+    <!-- Header -->
+    <div class="mb-8 max-w-7xl mx-auto">
+        <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Admin<span class="text-blue-500">Panel</span></h1>
+                    <p class="text-xs text-slate-500">MTracker System Management</p>
+                </div>
+            </div>
+
+            <div class="hidden md:flex gap-2 items-center">
+                <a href="{{ url_for('index') }}" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+
+                <button id="theme-toggle" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="Toggle Theme">
+                    <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
+                </button>
+
+                <!-- Profile Dropdown -->
+                <div class="relative" id="profile-dropdown-container">
+                    <button onclick="toggleProfileDropdown(event)" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-2 py-1 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500"
+                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500">
+                        {% endif %}
+                        <span class="font-medium mr-1">{{ current_user.name.split(' ')[0] if current_user.name else 'User' }}</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 opacity-50"></i>
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
+                            Profile Settings
+                        </a>
+                        <div class="border-t border-slate-200 dark:border-slate-700 my-1"></div>
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Actions -->
+            <div class="flex md:hidden gap-2 items-center">
+                <button id="theme-toggle-mobile" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white p-2.5 rounded transition-colors border border-slate-300 dark:border-slate-600 shadow-sm" title="Toggle Theme">
+                    <i id="theme-icon-mobile" data-lucide="sun" class="w-5 h-5"></i>
+                </button>
+                <div class="relative">
+                    <button onclick="toggleProfileDropdownMobile(event)" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded transition-colors border border-blue-500">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-8 h-8 rounded-full object-cover"
+                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                                 class="w-8 h-8 rounded-full object-cover">
+                        {% endif %}
+                    </button>
+                    <div id="profile-dropdown-menu-mobile" class="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-500"></i>
+                            Dashboard
+                        </a>
+                        <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
+                            Profile
+                        </a>
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="card p-6 flex items-center gap-4 border-l-4 border-l-blue-500">
+                <div class="p-3 bg-blue-500/10 rounded-full text-blue-500">
+                    <i data-lucide="users"></i>
+                </div>
+                <div>
+                    <h3 class="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Users</h3>
+                    <p class="text-2xl font-bold">{{ stats.total_users }}</p>
+                </div>
+            </div>
+
+            <div class="card p-6 flex items-center gap-4 border-l-4 border-l-green-500">
+                <div class="p-3 bg-green-500/10 rounded-full text-green-500">
+                    <i data-lucide="user-check"></i>
+                </div>
+                <div>
+                    <h3 class="text-slate-500 text-xs font-bold uppercase tracking-wider">Active Users</h3>
+                    <p class="text-2xl font-bold">{{ stats.active_users }}</p>
+                </div>
+            </div>
+
+            <div class="card p-6 flex items-center gap-4 border-l-4 border-l-purple-500">
+                <div class="p-3 bg-purple-500/10 rounded-full text-purple-500">
+                    <i data-lucide="calendar"></i>
+                </div>
+                <div>
+                    <h3 class="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Months</h3>
+                    <p class="text-2xl font-bold">{{ stats.total_months }}</p>
+                </div>
+            </div>
+
+            <div class="card p-6 flex items-center gap-4 border-l-4 border-l-orange-500">
+                <div class="p-3 bg-orange-500/10 rounded-full text-orange-500">
+                    <i data-lucide="indian-rupee"></i>
+                </div>
+                <div>
+                    <h3 class="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Flow</h3>
+                    <p class="text-2xl font-bold">₹{{ stats.total_expenditure|round(0)|int|format_currency }}</p>
+                </div>
+            </div>
+
+            <div class="card p-6 flex items-center gap-4 border-l-4 border-l-rose-500">
+                <div class="p-3 bg-rose-500/10 rounded-full text-rose-500">
+                    <i data-lucide="bar-chart-3"></i>
+                </div>
+                <div>
+                    <h3 class="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Trans.</h3>
+                    <p class="text-2xl font-bold">{{ stats.total_transactions }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management Table -->
+        <div class="card overflow-hidden">
+            <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <h2 class="text-lg font-bold">User Management</h2>
+                <div class="text-xs text-slate-500">Total: {{ users|length }} users</div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User Details</th>
+                            <th>Status</th>
+                            <th>Reg. Date</th>
+                            <th>Activity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr class="hover:bg-slate-500/5 transition-colors">
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500">
+                                        {{ user.name[0]|upper }}
+                                    </div>
+                                    <div>
+                                        <div class="font-bold">
+                                            {{ user.name }}
+                                            {% if user.is_admin %}
+                                            <span class="ml-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 rounded uppercase">Admin</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-xs text-slate-500">
+                                            {% if user.email %}{{ user.email }}{% else %}{{ user.phone }}{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                <span class="flex items-center gap-1.5 text-xs text-green-500 font-medium">
+                                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                    Active
+                                </span>
+                                {% else %}
+                                <span class="flex items-center gap-1.5 text-xs text-rose-500 font-medium">
+                                    <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                    Deactivated
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="text-xs font-medium">{{ user.created_at }}</div>
+                                <div class="text-[10px] text-slate-500">via {{ user.registration_method }}</div>
+                            </td>
+                            <td>
+                                <div class="text-xs font-bold">{{ user.month_count }} Months</div>
+                                <div class="text-[10px] text-slate-500">{{ user.total_transactions }} Transactions</div>
+                            </td>
+                            <td>
+                                <div class="flex gap-2">
+                                    <button onclick="toggleAdmin('{{ user.id }}', '{{ user.name }}', {{ 'true' if user.is_admin else 'false' }})" class="btn-action {% if user.is_admin %}text-blue-500 bg-blue-500/10 hover:bg-blue-500/20{% else %}text-slate-500 bg-slate-500/10 hover:bg-slate-500/20{% endif %}" title="{% if user.is_admin %}Demote from Admin{% else %}Promote to Admin{% endif %}">
+                                        <i data-lucide="shield{% if user.is_admin %}-off{% endif %}" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="toggleUser('{{ user.id }}', '{{ user.name }}')" class="btn-action {% if user.is_active %}text-orange-500 bg-orange-500/10 hover:bg-orange-500/20{% else %}text-green-500 bg-green-500/10 hover:bg-green-500/20{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Reactivate{% endif %}">
+                                        <i data-lucide="{% if user.is_active %}user-minus{% else %}user-plus{% endif %}" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="deleteUser('{{ user.id }}', '{{ user.name }}')" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete Permanently">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Confirmation Modal (Admin) -->
+    <div id="adminConfirmModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="card w-96 max-w-full m-4 p-6 shadow-2xl">
+            <div id="confirmIconContainer" class="w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto">
+                <i id="confirmIcon" data-lucide="alert-triangle"></i>
+            </div>
+            <h3 id="confirmTitle" class="text-xl font-bold mb-2 text-center text-slate-800 dark:text-white">Confirm Action</h3>
+            <p id="confirmMessage" class="text-slate-500 dark:text-slate-400 mb-6 text-center"></p>
+            <div class="flex gap-3">
+                <button onclick="closeConfirmModal()" class="flex-1 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-bold py-2 rounded border border-slate-300 dark:border-slate-500 shadow-sm active:translate-y-0.5 transition-all">Cancel</button>
+                <button id="confirmBtn" class="flex-1 py-2 rounded text-white font-bold transition-all shadow-md active:translate-y-0.5"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Toast -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl opacity-0 transition-opacity pointer-events-none z-[100] border border-slate-700">
+        <span id="toastMsg"></span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-12 pt-10 border-t border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm max-w-6xl mx-auto px-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+            <div class="col-span-1 md:col-span-2 space-y-4">
+                <div class="flex items-center gap-2 text-slate-900 dark:text-slate-200">
+                    <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                        <i data-lucide="wallet" class="w-5 h-5"></i>
+                    </div>
+                    <span class="font-bold text-lg">MTracker</span>
+                </div>
+                <p class="max-w-md">The modern approach to managing your personal finances. Track every penny, analyze your spending, and achieve your financial goals with ease.</p>
+                <div class="flex gap-4">
+                    <a href="https://github.com/dwaipayanbiswas2017/MTracker" target="_blank" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white" title="GitHub Repository">
+                        <i data-lucide="github" class="w-5 h-5"></i>
+                    </a>
+                    <a href="mailto:support@mtracker.com" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white" title="Contact Support">
+                        <i data-lucide="mail" class="w-5 h-5"></i>
+                    </a>
+                </div>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Navigation</h4>
+                <ul class="space-y-3">
+                    <li><a href="{{ url_for('index') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard</a></li>
+                    <li><a href="{{ url_for('profile') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="user-cog" class="w-4 h-4"></i> Profile Settings</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Resources</h4>
+                <ul class="space-y-3">
+                    <li><a href="#" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> Documentation</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Privacy Policy</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="text-center py-6 border-t border-slate-200 dark:border-slate-800 opacity-60">
+            &copy; 2026 MTracker Systems. All rights reserved. Built for private financial tracking.
+        </div>
+    </footer>
+
+    <script>
+        $(document).ready(function() {
+            lucide.createIcons();
+
+            // Theme initialization
+            if (localStorage.getItem('theme') === 'dark') {
+                $('#theme-icon, #theme-icon-mobile').attr('data-lucide', 'moon');
+            } else {
+                $('#theme-icon, #theme-icon-mobile').attr('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+        });
+
+        function toggleTheme() {
+            const html = $('html');
+            const icons = $('#theme-icon, #theme-icon-mobile');
+            if (html.hasClass('dark')) {
+                html.removeClass('dark');
+                localStorage.setItem('theme', 'light');
+                icons.attr('data-lucide', 'sun');
+            } else {
+                html.addClass('dark');
+                localStorage.setItem('theme', 'dark');
+                icons.attr('data-lucide', 'moon');
+            }
+            lucide.createIcons();
+        }
+
+        $('#theme-toggle, #theme-toggle-mobile').click(toggleTheme);
+
+        function toggleProfileDropdown(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu').toggleClass('hidden');
+        }
+
+        function toggleProfileDropdownMobile(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu-mobile').toggleClass('hidden');
+        }
+
+        $(document).click(function() {
+            $('#profile-dropdown-menu').addClass('hidden');
+            $('#profile-dropdown-menu-mobile').addClass('hidden');
+        });
+
+        function showToast(msg) {
+            $('#toastMsg').text(msg);
+            $('#toast').css('opacity', '1');
+            setTimeout(() => {
+                $('#toast').css('opacity', '0');
+            }, 3000);
+        }
+
+        function closeConfirmModal() {
+            $('#adminConfirmModal').addClass('hidden').removeClass('flex');
+        }
+
+        function toggleAdmin(id, name, isAdmin) {
+            const action = isAdmin ? 'Demote from Admin' : 'Promote to Admin';
+            const message = isAdmin
+                ? `Are you sure you want to remove admin privileges from <strong>${name}</strong>?`
+                : `Are you sure you want to promote <strong>${name}</strong> to a System Administrator?`;
+
+            $('#confirmTitle').text(action);
+            $('#confirmMessage').html(message);
+            $('#confirmIconContainer').attr('class', isAdmin
+                ? 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-blue-500/10 text-blue-500'
+                : 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-blue-600/10 text-blue-600');
+            $('#confirmIcon').attr('data-lucide', isAdmin ? 'shield-off' : 'shield-check');
+
+            $('#confirmBtn').text('Confirm').attr('class', 'flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-blue-500/20');
+
+            $('#adminConfirmModal').removeClass('hidden').addClass('flex');
+            lucide.createIcons();
+
+            $('#confirmBtn').off('click').on('click', function() {
+                $.post(`/admin/toggle_admin/${id}`, function(res) {
+                    if (res.status === 'success') {
+                        location.reload();
+                    } else {
+                        showToast(res.message);
+                        closeConfirmModal();
+                    }
+                }).fail(err => {
+                    showToast(err.responseJSON.message || "Error toggling admin status");
+                    closeConfirmModal();
+                });
+            });
+        }
+
+        function toggleUser(id, name) {
+            $('#confirmTitle').text('Toggle Account Status');
+            $('#confirmMessage').text(`Are you sure you want to change the status for ${name}?`);
+            $('#confirmIconContainer').attr('class', 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-orange-500/10 text-orange-500');
+            $('#confirmIcon').attr('data-lucide', 'user-check');
+
+            $('#confirmBtn').text('Confirm Change').attr('class', 'flex-1 bg-orange-600 hover:bg-orange-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-orange-500/20');
+
+            $('#adminConfirmModal').removeClass('hidden').addClass('flex');
+            lucide.createIcons();
+
+            $('#confirmBtn').off('click').on('click', function() {
+                $.post(`/admin/toggle_user/${id}`, function(res) {
+                    if (res.status === 'success') {
+                        location.reload();
+                    } else {
+                        showToast(res.message);
+                        closeConfirmModal();
+                    }
+                }).fail(err => {
+                    showToast(err.responseJSON.message || "Error toggling status");
+                    closeConfirmModal();
+                });
+            });
+        }
+
+        function deleteUser(id, name) {
+            $('#confirmTitle').text('PERMANENT DELETION');
+            $('#confirmMessage').html(`Careful! This will delete <strong>${name}</strong> and all their financial records permanently. This action cannot be undone.`);
+            $('#confirmIconContainer').attr('class', 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-rose-500/10 text-rose-500');
+            $('#confirmIcon').attr('data-lucide', 'trash-2');
+
+            $('#confirmBtn').text('DELETE FOREVER').attr('class', 'flex-1 bg-rose-600 hover:bg-rose-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-rose-500/20');
+
+            $('#adminConfirmModal').removeClass('hidden').addClass('flex');
+            lucide.createIcons();
+
+            $('#confirmBtn').off('click').on('click', function() {
+                $.post(`/admin/delete_user/${id}`, function(res) {
+                    if (res.status === 'success') {
+                        location.reload();
+                    } else {
+                        showToast(res.message);
+                        closeConfirmModal();
+                    }
+                }).fail(err => {
+                    showToast(err.responseJSON.message || "Error deleting user");
+                    closeConfirmModal();
+                });
+            });
+        }
+    </script>
+</body>
+</html>

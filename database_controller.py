@@ -58,6 +58,24 @@ class DatabaseController:
         finally:
             conn.close()
 
+    def is_identifier_available(self, identifier, exclude_user_id=None):
+        """
+        Checks if an email or phone number is already in use by another user.
+        """
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = "SELECT id FROM users WHERE (email = %s OR phone = %s)"
+            params = [identifier, identifier]
+            if exclude_user_id:
+                query += " AND id != %s"
+                params.append(exclude_user_id)
+            cursor.execute(query, tuple(params))
+            return cursor.fetchone() is None
+        finally:
+            conn.close()
+
     def create_user(self, user_id, name, password_hash, email=None, phone=None, registration_method='email'):
         """
         Creates a new user record in the database.
@@ -557,3 +575,104 @@ class DatabaseController:
         Helper to save data imported from CSV.
         """
         return self.save_month_data(user_id, month_key, bulk_data)
+
+    # --- Admin Operations ---
+
+    def get_all_users_with_stats(self):
+        """Retrieves all users with summary stats for the admin dashboard."""
+        conn = self.get_connection()
+        if not conn: return []
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """
+                SELECT
+                    u.id, u.name, u.email, u.phone, u.registration_method,
+                    u.is_active, u.is_admin, u.created_at,
+                    (SELECT COUNT(*) FROM months WHERE user_id = u.id) as month_count,
+                    (SELECT COUNT(*) FROM paid_expenses WHERE user_id = u.id) +
+                    (SELECT COUNT(*) FROM personal_expenses WHERE user_id = u.id) as total_transactions
+                FROM users u
+                ORDER BY u.created_at DESC
+            """
+            cursor.execute(query)
+            users = cursor.fetchall()
+            for u in users:
+                if u['created_at']:
+                    u['created_at'] = u['created_at'].strftime('%Y-%m-%d %H:%M')
+            return users
+        finally:
+            conn.close()
+
+    def toggle_user_status(self, user_id):
+        """Deactivates/Reactivates a user."""
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET is_active = NOT is_active WHERE id = %s", (user_id,))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def toggle_admin_status(self, user_id):
+        """Promotes/Demotes a user from admin status."""
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET is_admin = NOT is_admin WHERE id = %s", (user_id,))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def delete_user_cascading(self, user_id):
+        """Permanently deletes a user and all their data."""
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            # Deletion is simplified because of CASCADE constraints in schema
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def get_system_stats(self):
+        """Retrieves global system statistics."""
+        conn = self.get_connection()
+        if not conn: return {}
+        try:
+            cursor = conn.cursor(dictionary=True)
+            stats = {}
+            cursor.execute("SELECT COUNT(*) as total FROM users")
+            stats['total_users'] = cursor.fetchone()['total']
+
+            cursor.execute("SELECT COUNT(*) as active FROM users WHERE is_active = TRUE")
+            stats['active_users'] = cursor.fetchone()['active']
+
+            cursor.execute("SELECT COUNT(*) as total FROM months")
+            stats['total_months'] = cursor.fetchone()['total']
+
+            # Sum of ALL expenses (Paid + Personal)
+            cursor.execute("""
+                SELECT
+                    (SELECT COALESCE(SUM(amount), 0) FROM paid_expenses) +
+                    (SELECT COALESCE(SUM(amount), 0) FROM personal_expenses) as total
+            """)
+            res = cursor.fetchone()['total']
+            stats['total_expenditure'] = float(res) if res else 0.0
+
+            # Total Transactions count
+            cursor.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM paid_expenses) +
+                    (SELECT COUNT(*) FROM personal_expenses) as total
+            """)
+            stats['total_transactions'] = cursor.fetchone()['total']
+
+            return stats
+        finally:
+            conn.close()

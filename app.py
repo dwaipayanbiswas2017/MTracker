@@ -1,6 +1,8 @@
 import csv
 import io
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
+import random
+import time
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -36,7 +38,7 @@ login_manager.login_message = None # Disable default login message
 # --- User Management ---
 
 class User(UserMixin):
-    def __init__(self, id, name, password_hash, email=None, phone=None, registration_method='email', profile_pic_path=None, currency_pref='INR', default_account_id=None):
+    def __init__(self, id, name, password_hash, email=None, phone=None, registration_method='email', profile_pic_path=None, currency_pref='INR', default_account_id=None, is_admin=False):
         self.id = id
         self.name = name
         self.password_hash = password_hash
@@ -46,6 +48,7 @@ class User(UserMixin):
         self.profile_pic_path = profile_pic_path
         self.currency_pref = currency_pref
         self.default_account_id = default_account_id
+        self.is_admin = is_admin
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -60,7 +63,8 @@ def load_user(user_id):
             u.get('registration_method', 'email'),
             u.get('profile_pic_path'),
             u.get('currency_pref', 'INR'),
-            u.get('default_account_id')
+            u.get('default_account_id'),
+            u.get('is_admin', False)
         )
     return None
 
@@ -112,11 +116,14 @@ def login():
                 user_data['password_hash'],
                 user_data.get('email'),
                 user_data.get('phone'),
-                user_data.get('registration_method', 'email')
+                user_data.get('registration_method', 'email'),
+                user_data.get('profile_pic_path'),
+                user_data.get('currency_pref', 'INR'),
+                user_data.get('default_account_id'),
+                user_data.get('is_admin', False)
             )
             login_user(user)
             return redirect(url_for('index'))
-
         flash('Invalid Email/Phone or password')
     return render_template('login.html')
 
@@ -139,7 +146,7 @@ def register():
         reg_method = 'email' if '@' in identifier else 'phone'
 
         if db.create_user(user_id, name, password_hash, email, phone, reg_method):
-            user = User(user_id, name, password_hash, email, phone, reg_method)
+            user = User(user_id, name, password_hash, email, phone, reg_method, is_admin=False)
             login_user(user)
             return redirect(url_for('index'))
         else:
@@ -502,52 +509,65 @@ def delete_expense(month_id, expense_id):
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Could not delete expense"}), 500
 
+@app.route('/api/update_password', methods=['POST'])
+@login_required
+def update_password():
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if not new_password or len(new_password) < 6:
+        return jsonify({"status": "error", "message": "New password must be at least 6 characters long."}), 400
+
+    if new_password != confirm_password:
+        return jsonify({"status": "error", "message": "Passwords do not match."}), 400
+
+    is_verified = False
+    if current_password and check_password_hash(current_user.password_hash, current_password):
+        is_verified = True
+    elif session.get('pwd_verified_via_otp'):
+        is_verified = True
+        session.pop('pwd_verified_via_otp', None)
+
+    if not is_verified:
+        return jsonify({"status": "error", "message": "Identity verification failed."}), 403
+
+    password_hash = generate_password_hash(new_password)
+    if db.update_user(current_user.id, password_hash=password_hash):
+        return jsonify({"status": "success", "message": "Password updated successfully!"})
+
+    return jsonify({"status": "error", "message": "Failed to update password."}), 500
+
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
     if request.method == 'POST':
         name = request.form.get('name')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
         currency_pref = request.form.get('currency_pref', 'INR')
         default_account_id = request.form.get('default_account_id')
 
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-
-        # Handle Profile Picture
-        profile_pic_path = current_user.profile_pic_path
-        if 'profile_pic' in request.files:
-            file = request.files['profile_pic']
-            if file and file.filename != '':
-                filename = secure_filename(f"{current_user.id}_{file.filename}")
-                # Ensure the path is relative to 'static/' for url_for
-                rel_path = os.path.join('uploads', 'profile_pics', filename)
-                full_path = os.path.join(app.root_path, 'static', rel_path)
-                file.save(full_path)
-                profile_pic_path = os.path.join('static', rel_path).replace('\\', '/')
-
-        password_hash = None
-        if new_password:
-            if not current_password or not check_password_hash(current_user.password_hash, current_password):
-                flash('Incorrect current password', 'danger')
-                return redirect(url_for('profile'))
-            if new_password != confirm_password:
-                flash('New passwords do not match', 'danger')
-                return redirect(url_for('profile'))
-            password_hash = generate_password_hash(new_password)
+        # We keep email/phone in the form for fallback, but they are disabled if handled by OTP
+        # and identifying registration method, so we should be careful.
+        # Actually, the requirement says "User can update email and phone both with proper OTP verification".
+        # This implies we should handle them specifically.
 
         if db.update_user(
             current_user.id,
             name=name,
-            email=email,
-            phone=phone,
-            profile_pic_path=profile_pic_path,
+            profile_pic_path=None, # will be updated if file present
             currency_pref=currency_pref,
-            default_account_id=default_account_id if default_account_id else None,
-            password_hash=password_hash
+            default_account_id=default_account_id if default_account_id else None
         ):
+            # Re-handle profile pic specifically since we skipped it above for DB call simplicity
+            if 'profile_pic' in request.files:
+                file = request.files['profile_pic']
+                if file and file.filename != '':
+                    filename = secure_filename(f"{current_user.id}_{file.filename}")
+                    rel_path = os.path.join('uploads', 'profile_pics', filename)
+                    full_path = os.path.join(app.root_path, 'static', rel_path)
+                    file.save(full_path)
+                    db.update_user(current_user.id, profile_pic_path=os.path.join('static', rel_path).replace('\\', '/'))
+
             flash('Profile updated successfully', 'success')
         else:
             flash('Error updating profile', 'danger')
@@ -556,6 +576,151 @@ def profile():
 
     accounts = db.get_accounts(current_user.id)
     return render_template('profile.html', user=current_user, accounts=accounts)
+
+# --- Admin Routes ---
+
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    if not current_user.is_admin:
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+
+    users = db.get_all_users_with_stats()
+    stats = db.get_system_stats()
+    return render_template('admin.html', users=users, stats=stats)
+
+@app.route('/admin/toggle_user/<user_id>', methods=['POST'])
+@login_required
+def admin_toggle_user(user_id):
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    if user_id == current_user.id:
+        return jsonify({"status": "error", "message": "You cannot deactivate your own account."}), 400
+
+    if db.toggle_user_status(user_id):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not toggle user status"}), 500
+
+@app.route('/admin/toggle_admin/<user_id>', methods=['POST'])
+@login_required
+def admin_toggle_admin(user_id):
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    if user_id == str(current_user.id):
+        return jsonify({"status": "error", "message": "You cannot remove your own admin status."}), 400
+
+    if db.toggle_admin_status(user_id):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not toggle admin status"}), 500
+
+@app.route('/admin/delete_user/<user_id>', methods=['POST'])
+@login_required
+def admin_delete_user(user_id):
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    if user_id == current_user.id:
+        return jsonify({"status": "error", "message": "You cannot delete your own account."}), 400
+
+    if db.delete_user_cascading(user_id):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not delete user"}), 500
+
+# --- Jinja Filters ---
+
+@app.template_filter('format_currency')
+def format_currency_filter(value):
+    try:
+        return "{:,.0f}".format(value)
+    except (ValueError, TypeError):
+        return value
+
+# For OTP storage (in production, use Redis or DB with expiry)
+otp_storage = {}
+
+@app.route('/api/verify_password', methods=['POST'])
+@login_required
+def verify_password():
+    password = request.json.get('password')
+    if not password:
+        return jsonify({"status": "error", "message": "Password is required"}), 400
+
+    if check_password_hash(current_user.password_hash, password):
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Incorrect password"}), 401
+
+@app.route('/api/send_otp', methods=['POST'])
+@login_required
+def send_otp():
+    new_identifier = request.json.get('identifier')
+
+    # If a new identifier is provided, check if it's already in use
+    if new_identifier:
+        if not db.is_identifier_available(new_identifier, exclude_user_id=current_user.id):
+            return jsonify({"status": "error", "message": "This email/phone is already registered to another account."}), 400
+        target_info = f"New Identifier: {new_identifier}"
+    else:
+        if not current_user.email and not current_user.phone:
+            return jsonify({"status": "error", "message": "No contact information found"}), 400
+        target_info = f"Registered Email: {current_user.email}, Phone: {current_user.phone}"
+
+    otp = str(random.randint(100000, 999999))
+    otp_storage[current_user.id] = {
+        "otp": otp,
+        "expiry": time.time() + 300,
+        "pending_identifier": new_identifier # Store if we are updating identifier
+    }
+
+    # Mocking sending
+    targets = []
+    if new_identifier:
+        # If updating, send ONLY to the new one
+        print(f"[MOCK] Sending Verification OTP {otp} to NEW identifier: {new_identifier}")
+        targets.append("New Entry")
+    else:
+        # If just verifying for password change, send to existing
+        if current_user.email:
+            print(f"[MOCK] Sending OTP {otp} to Email: {current_user.email}")
+            targets.append("Email")
+        if current_user.phone:
+            print(f"[MOCK] Sending OTP {otp} to SMS: {current_user.phone}")
+            targets.append("SMS")
+
+    return jsonify({"status": "success", "message": f"OTP sent to {target_info}", "target": ', '.join(targets)})
+
+@app.route('/api/verify_otp', methods=['POST'])
+@login_required
+def verify_otp():
+    user_otp = request.json.get('otp')
+    if not user_otp:
+        return jsonify({"status": "error", "message": "OTP is required"}), 400
+
+    stored = otp_storage.get(current_user.id)
+    if not stored:
+        return jsonify({"status": "error", "message": "OTP session not found"}), 404
+
+    if time.time() > stored['expiry']:
+        del otp_storage[current_user.id]
+        return jsonify({"status": "error", "message": "OTP expired"}), 400
+
+    if stored['otp'] == user_otp:
+        # If there's a pending identifier, update it in the database immediately
+        pending_id = stored.get('pending_identifier')
+        if pending_id:
+            if '@' in pending_id:
+                db.update_user(current_user.id, email=pending_id)
+            else:
+                db.update_user(current_user.id, phone=pending_id)
+            del otp_storage[current_user.id]
+            return jsonify({"status": "success", "message": "Identity updated successfully", "type": "identifier_update"})
+
+        session['pwd_verified_via_otp'] = True
+        return jsonify({"status": "success", "message": "Verification successful", "type": "password_verification"})
+
+    return jsonify({"status": "error", "message": "Invalid OTP"})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
