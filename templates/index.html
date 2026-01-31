@@ -1100,6 +1100,7 @@
     <script>
         const DEFAULT_ACCOUNT_ID = "{{ user.default_account_id or '' }}";
         let currentData = {};
+        let currentViewMode = 'all';
         let currentMonthId = '';
         let accounts = [];
         let categories = [];
@@ -1224,6 +1225,16 @@
             $('#profile-dropdown-menu').addClass('hidden');
             $('#profile-dropdown-menu-mobile').addClass('hidden');
         });
+
+        function setViewMode(mode) {
+            if (mode === 'default' && !DEFAULT_ACCOUNT_ID) {
+                showMessageModal('Please select a Default Account in your user profile first.', 'No Default Account');
+                return;
+            }
+            currentViewMode = mode;
+            renderUI();
+        }
+
         // --- API Calls ---
 
         function loadCategories() {
@@ -1572,9 +1583,42 @@
                  }
             }
 
+            // View Mode Logic
+            let displayAvailable = totalAvailable;
+            let displayCurrent = currentBalance;
+            let displayExpected = expectedBalance;
+            let displayInitialBreakdown = initialBreakdownHtml;
+            let displayCurrentBreakdown = currentBreakdownHtml;
+
+            if (currentViewMode === 'default' && DEFAULT_ACCOUNT_ID) {
+                // Resolve Default Account Name from ID
+                const defaultAccObj = accounts.find(a => String(a.id) === String(DEFAULT_ACCOUNT_ID));
+                const defaultAccountName = defaultAccObj ? defaultAccObj.account_name : '';
+
+                if (defaultAccountName) {
+                    displayAvailable = initialAccountBalances[defaultAccountName] || 0;
+                    displayCurrent = accountBalances[defaultAccountName] || 0;
+                    // For Default View: Expected = Current (of default) - Pending (Global?)
+                    // NOTE: Pending is usually not linked to account until paid.
+                    // Showing Global Pending against Default Account Balance is safer than showing 0.
+                    displayExpected = displayCurrent - totalPending;
+
+                    displayInitialBreakdown = `<div class="flex justify-between text-xs text-slate-500 dark:text-slate-400"><span>${defaultAccountName}</span> <span>₹${displayAvailable.toLocaleString()}</span></div>`;
+                    displayCurrentBreakdown = `<div class="flex justify-between text-xs text-slate-500 dark:text-slate-400"><span>${defaultAccountName}</span> <span>₹${displayCurrent.toLocaleString()}</span></div>`;
+                }
+            }
+
             $('#statsContainer').html(`
                 <!-- Balance Card -->
                 <div class="card border-l-4 border-l-blue-500 p-4 flex flex-col justify-between gap-4">
+
+                    <div class="flex justify-end">
+                        <div class="bg-slate-100 dark:bg-slate-700/50 p-0.5 rounded flex text-xs font-medium border border-slate-200 dark:border-slate-600">
+                             <button onclick="setViewMode('all')" class="${currentViewMode === 'all' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'} px-2 py-0.5 rounded transition-all">All</button>
+                             <button onclick="setViewMode('default')" class="${currentViewMode === 'default' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'} px-2 py-0.5 rounded transition-all">Default</button>
+                        </div>
+                    </div>
+
                     <!-- Initial -->
                     <div class="border-b border-slate-200 dark:border-slate-700 pb-2">
                         <div class="flex justify-between items-center mb-1">
@@ -1582,10 +1626,10 @@
                                 <div class="text-slate-500 dark:text-slate-400 text-sm uppercase font-bold">Initial Balance</div>
                                 <div class="text-xs text-slate-400">Opening + Income</div>
                             </div>
-                            <div class="text-2xl font-bold text-slate-700 dark:text-slate-200">₹${totalAvailable.toLocaleString()}</div>
+                            <div class="text-2xl font-bold text-slate-700 dark:text-slate-200">₹${displayAvailable.toLocaleString()}</div>
                         </div>
                         <div class="mt-1 pl-2 border-l-2 border-slate-200 dark:border-slate-700 space-y-0.5">
-                            ${initialBreakdownHtml}
+                            ${displayInitialBreakdown}
                         </div>
                     </div>
 
@@ -1596,10 +1640,10 @@
                                 <div class="text-blue-500 text-sm uppercase font-bold">Current Balance</div>
                                 <div class="text-xs text-slate-400">Available Now</div>
                             </div>
-                            <div class="text-3xl font-bold text-blue-600 dark:text-blue-400">₹${currentBalance.toLocaleString()}</div>
+                            <div class="text-3xl font-bold text-blue-600 dark:text-blue-400">₹${displayCurrent.toLocaleString()}</div>
                         </div>
                         <div class="mt-1 pl-2 border-l-2 border-blue-200 dark:border-blue-900 space-y-0.5">
-                            ${currentBreakdownHtml}
+                            ${displayCurrentBreakdown}
                         </div>
                     </div>
 
@@ -1609,7 +1653,7 @@
                             <div class="text-emerald-500 text-sm uppercase font-bold">Expected Balance</div>
                             <div class="text-xs text-slate-400">Pending (₹${totalPending.toLocaleString()})</div>
                         </div>
-                        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹${expectedBalance.toLocaleString()}</div>
+                        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹${displayExpected.toLocaleString()}</div>
                     </div>
                 </div>
             `);
@@ -2479,6 +2523,7 @@
                 accounts = accs;
                 updateAccountDropdowns();
                 renderAccountsList();
+                if (currentData && currentMonthId) renderUI();
             }).fail(function(xhr) {
                 if (xhr.status === 401) window.location.href = '/login';
             });
