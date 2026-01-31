@@ -475,6 +475,27 @@ def add_long_pending():
         return jsonify({"status": "success", "data": new_item})
     return jsonify({"status": "error", "message": "Could not add long pending item"}), 500
 
+@app.route('/api/long_pending/update', methods=['POST'])
+@login_required
+def update_long_pending():
+    req = request.json
+    try:
+        item_data = {
+            "id": req.get('id'),
+            "reason": req.get('reason'),
+            "totalAmount": float(req.get('totalAmount')),
+            "category": req.get('category')
+        }
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid amount format"}), 400
+
+    if not item_data['id']:
+        return jsonify({"status": "error", "message": "Item ID required"}), 400
+
+    if db.update_long_pending(current_user.id, item_data):
+         return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Could not update item"}), 500
+
 @app.route('/api/long_pending/<item_id>', methods=['DELETE'])
 @login_required
 def delete_long_pending(item_id):

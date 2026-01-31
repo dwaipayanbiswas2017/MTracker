@@ -499,6 +499,29 @@ class DatabaseController:
         finally:
             conn.close()
 
+    def update_long_pending(self, user_id, item_data):
+        """Updates a long-pending debt/payment item."""
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            query = """
+                UPDATE long_pending
+                SET reason = %s, total_amount = %s, category = %s
+                WHERE user_id = %s AND id = %s
+            """
+            cursor.execute(query, (
+                item_data['reason'],
+                item_data['totalAmount'],
+                item_data.get('category'),
+                user_id,
+                item_data['id']
+            ))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
     def delete_long_pending(self, user_id, item_id):
         """Deletes a long-pending item from the database."""
         conn = self.get_connection()

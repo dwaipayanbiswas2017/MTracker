@@ -1055,6 +1055,59 @@
         </div>
     </div>
 
+    <!-- Edit Transaction Modal -->
+    <div id="editTransactionModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="card w-full max-w-md mx-4 p-0 overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white" id="editTransTitle">Edit Transaction</h3>
+                <button onclick="closeEditTransactionModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="editTransType">
+                <input type="hidden" id="editTransId">
+
+                <!-- Common Fields -->
+                <div id="editField-reason" class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-500 uppercase">Description / Source</label>
+                    <input type="text" id="editTransReason" class="input-dark" placeholder="Description">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div id="editField-amount" class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500 uppercase">Amount</label>
+                        <input type="number" step="0.01" id="editTransAmount" class="input-dark" placeholder="0.00">
+                    </div>
+                    <div id="editField-date" class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-500 uppercase">Date</label>
+                        <input type="date" id="editTransDate" class="input-dark">
+                    </div>
+                </div>
+
+                <div id="editField-category" class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-500 uppercase">Category</label>
+                    <select id="editTransCategory" class="input-dark">
+                        <!-- Options populated via JS -->
+                    </select>
+                </div>
+
+                <div id="editField-account" class="space-y-1">
+                    <label class="text-xs font-semibold text-slate-500 uppercase">Account</label>
+                    <select id="editTransAccount" class="input-dark">
+                        <!-- Options populated via JS -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+                <button onclick="closeEditTransactionModal()" class="w-full py-2 bg-white dark:bg-slate-700 text-slate-700 dark:text-white rounded-lg font-bold border border-slate-300 dark:border-slate-500 shadow-sm active:translate-y-0.5 transition-all">Cancel</button>
+                <button onclick="saveEditTransaction()" class="w-full py-2 bg-blue-600 text-white rounded-lg font-bold shadow-md active:translate-y-0.5 transition-all">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="mt-12 pt-10 border-t border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm max-w-6xl mx-auto px-4">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
@@ -1103,6 +1156,7 @@
         let currentViewMode = 'all';
         let currentMonthId = '';
         let accounts = [];
+        let longPendingData = [];
         let categories = [];
         let expenseChart = null;
         let pdfChart = null;
@@ -1561,6 +1615,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="font-mono text-teal-600 dark:text-teal-400">₹${item.amount.toLocaleString()}</span>
+                        <button onclick="editItem('income', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100"><i data-lucide="pencil" class="w-3 h-3"></i></button>
                         <button onclick="deleteItem('income', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
                     </div>
                 </div>
@@ -1696,6 +1751,7 @@
                     <td class="p-2 text-slate-500 dark:text-slate-400 text-sm">${item.date}</td>
                     <td class="p-2 text-right font-mono text-emerald-600 dark:text-emerald-400">₹${item.amount.toLocaleString()}</td>
                     <td class="p-2 text-right">
+                        <button onclick="editItem('paid', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100 mr-2"><i data-lucide="pencil" class="w-4 h-4"></i></button>
                         <button onclick="deleteItem('paidExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
                 </tr>`;
@@ -1737,6 +1793,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="font-mono text-blue-600 dark:text-blue-300">₹${item.amount}</span>
+                        <button onclick="editItem('personal', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100"><i data-lucide="pencil" class="w-3 h-3"></i></button>
                         <button onclick="deleteItem('personalExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
                     </div>
                 </div>
@@ -1763,6 +1820,9 @@
                         </div>
                         <button onclick="payItem('${item.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded" title="Mark Paid">
                             <i data-lucide="check" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="editItem('pending', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100 p-1">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
                         </button>
                         <button onclick="deleteItem('pendingExpenses', '${item.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 p-1">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -2341,6 +2401,7 @@
 
         function loadLongPending() {
             $.get('/api/long_pending', function(data) {
+                longPendingData = data; // Store globally
                 const list = $('#longPendingList');
                 list.empty();
                 let totalRemaining = 0;
@@ -2376,6 +2437,9 @@
                             <div class="flex justify-end gap-2">
                                 <button onclick="payLongPending(${item.id}, '${item.reason}', ${item.remainingAmount})" class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded flex items-center gap-1">
                                     <i data-lucide="banknote" class="w-3 h-3"></i> Pay
+                                </button>
+                                <button onclick="editItem('long_pending', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100 p-1">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
                                 </button>
                                 <button onclick="deleteLongPending('${item.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 p-1">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -2751,6 +2815,158 @@
         function closeCreateModal() {
             $('#createModal').addClass('hidden').removeClass('flex');
         }
+
+        // --- Edit Transaction Functions ---
+        function closeEditTransactionModal() {
+            $('#editTransactionModal').addClass('hidden').removeClass('flex');
+        }
+
+        function editItem(type, id) {
+            // Find item
+            let item = null;
+            if (type === 'income') item = currentData.income.find(i => String(i.id) === String(id));
+            else if (type === 'paid') item = currentData.paidExpenses.find(i => String(i.id) === String(id));
+            else if (type === 'personal') item = currentData.personalExpenses.find(i => String(i.id) === String(id));
+            else if (type === 'pending') item = currentData.pendingExpenses.find(i => String(i.id) === String(id));
+            else if (type === 'long_pending') item = longPendingData.find(i => String(i.id) === String(id));
+
+            if (!item) return;
+
+            // Setup Modal
+            $('#editTransTitle').text('Edit ' + (type === 'long_pending' ? 'Long Pending Item' : type.charAt(0).toUpperCase() + type.slice(1)));
+            $('#editTransType').val(type);
+            $('#editTransId').val(id);
+
+            // Populate Fields
+            $('#editTransReason').val(item.reason || item.source || item.reason || ''); // item.name removed as long_pending has reason field in DB but mapped to name/reason
+
+            // Special handling for Long Pending
+            // Note: In addLongPending, we use 'reason' in backend but 'reason' input in frontend.
+            // The DB has 'reason', 'total_amount'.
+            // The item object from API likely has 'reason' and 'totalAmount' or 'total_amount'.
+
+            const rawAmount = item.amount || item.totalAmount || item.total_amount || 0;
+            $('#editTransAmount').val(rawAmount);
+
+            // Date handling
+            let dateVal = '';
+            if (item.date) dateVal = item.date;
+            else if (item.createdDate) dateVal = item.createdDate;
+            $('#editTransDate').val(dateVal);
+
+            // Populate Dropdowns
+            // Categories
+            const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            $('#editTransCategory').html(catOptions).val(item.category || '');
+
+            // Accounts
+            const accOptions = accounts.map(a => `<option value="${a.account_name}">${a.account_name}</option>`).join('');
+            $('#editTransAccount').html(accOptions).val(item.account || '');
+
+
+            // Visibility Toggle based on Type
+            $('#editField-reason').show();
+            $('#editField-amount').show();
+            $('#editField-date').hide();
+            $('#editField-category').hide();
+            $('#editField-account').hide();
+
+            if (type === 'income') {
+                $('#editField-account').show();
+            } else if (type === 'paid') {
+                $('#editField-date').show();
+                $('#editField-category').show();
+                $('#editField-account').show();
+            } else if (type === 'personal') {
+                $('#editField-date').show();
+                $('#editField-account').show();
+            } else if (type === 'pending') {
+                $('#editField-category').show();
+            } else if (type === 'long_pending') {
+                // Name (in Reason field), Total Amount
+                $('#editField-category').show();
+            }
+
+            $('#editTransactionModal').removeClass('hidden').addClass('flex');
+        }
+
+        function saveEditTransaction() {
+            const type = $('#editTransType').val();
+            const id = $('#editTransId').val();
+            const reason = $('#editTransReason').val().trim();
+            const amount = parseFloat($('#editTransAmount').val());
+            const date = $('#editTransDate').val();
+            const category = $('#editTransCategory').val();
+            const account = $('#editTransAccount').val();
+
+            if (!reason || isNaN(amount)) {
+                alert("Please enter valid description and amount");
+                return;
+            }
+
+            if (type === 'long_pending') {
+                // Make API call for Long Pending
+                 $.ajax({
+                    url: '/api/long_pending/update',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        id: id,
+                        reason: reason,
+                        totalAmount: amount,
+                        category: category
+                    }),
+                    success: function(resp) {
+                        if(resp.status === 'success') {
+                            loadLongPending();
+                            closeEditTransactionModal();
+                        } else {
+                            showMessageModal(resp.message || 'Error updating item');
+                        }
+                    },
+                    error: function() { showMessageModal('Server Error'); }
+                });
+                return;
+            }
+
+            // For other types, update currentData locally
+            let list = null;
+            if (type === 'income') list = currentData.income;
+            else if (type === 'paid') list = currentData.paidExpenses;
+            else if (type === 'personal') list = currentData.personalExpenses;
+            else if (type === 'pending') list = currentData.pendingExpenses;
+
+            const itemIndex = list.findIndex(i => String(i.id) === String(id));
+            if (itemIndex > -1) {
+                const item = list[itemIndex];
+
+                // Update common fields
+                 if (type === 'income') {
+                    item.source = reason;
+                    item.amount = amount;
+                    item.account = account;
+                 } else if (type === 'paid') {
+                    item.reason = reason;
+                    item.amount = amount;
+                    item.date = date;
+                    item.category = category;
+                    item.account = account;
+                 } else if (type === 'personal') {
+                    item.reason = reason;
+                    item.amount = amount;
+                    item.date = date;
+                    item.account = account;
+                 } else if (type === 'pending') {
+                    item.reason = reason;
+                    item.amount = amount;
+                    item.category = category;
+                 }
+
+                 saveData();
+                 closeEditTransactionModal();
+            }
+        }
+
     </script>
 </body>
 </html>
