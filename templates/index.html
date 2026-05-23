@@ -600,10 +600,16 @@
                         <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                             <div class="grid grid-cols-2 md:flex gap-2">
                                 <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark col-span-2 md:flex-grow">
+
+                                <select id="newPersCategory" class="input-dark col-span-1 md:w-32">
+                                    <option value="">Category...</option>
+                                </select>
+
                                 <select id="newPersAccount" class="input-dark col-span-1 md:w-32">
                                     <option value="">Account...</option>
                                 </select>
                                 <div class="col-span-1 md:w-32 relative">
+
                                     <input type="date" id="newPersDate" class="input-dark w-full date-input">
                                     <span class="date-placeholder md:hidden">Date</span>
                                 </div>
@@ -1303,6 +1309,7 @@
                 }
                 $('#newPaidCat').html(options);
                 $('#newPendCat').html(options);
+                $('#newPersCategory').html(options);
                 renderCategoriesList();
             }).fail(function(xhr) {
                 if (xhr.status === 401) window.location.href = '/login';
@@ -1723,36 +1730,35 @@
             // Render Paid List with serial numbers
             let paidRows = '';
 
-            // Personal Expenses Summary Row (as first row if present)
-            let rowIndex = 0;
-            if (totalPersonal > 0) {
-                rowIndex++;
-                paidRows += `
-                <tr class="bg-blue-900/20 border-b border-blue-900/30">
-                    <td class="p-2 text-xs font-medium text-slate-600">${rowIndex}</td>
-                    <td class="p-2 font-medium text-blue-400">Personal Expenses (Total)</td>
-                    <td class="p-2 text-slate-400 text-xs">-</td>
-                    <td class="p-2"><span class="bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded text-xs">Personal</span></td>
-                    <td class="p-2 text-slate-400 text-xs">-</td>
-                    <td class="p-2 text-right font-mono text-blue-300">₹${totalPersonal.toLocaleString()}</td>
-                    <td class="p-2 text-right"></td>
-                </tr>`;
-            }
+            // Merge Paid and Personal for the Main Report View
+            // Mapping Personal items to match Paid item structure if needed, though they are similar now.
+            const paidItems = (currentData.paidExpenses || []).map(i => ({...i, listName: 'paidExpenses', sortDate: i.date}));
+            const personalItems = (currentData.personalExpenses || []).map(i => ({...i, listName: 'personalExpenses', sortDate: i.date || ''}));
 
-            const paidListArr = (currentData.paidExpenses || []).slice().reverse();
-            paidListArr.forEach(item => {
+            // Combine and Sort by Date Descending
+            const combinedList = [...paidItems, ...personalItems].sort((a, b) => {
+                if (!a.sortDate) return 1;
+                if (!b.sortDate) return -1;
+                return new Date(b.sortDate) - new Date(a.sortDate);
+            });
+
+            combinedList.forEach(item => {
                 rowIndex++;
+                // Visual distinction for Daily/Personal items could be subtle or explicit.
+                // We'll trust the category to distinguish them.
+                const categoryLabel = item.category || 'Personal';
+
                 paidRows += `
                 <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50 group">
                     <td class="p-2 text-xs text-slate-600">${rowIndex}</td>
                     <td class="p-2 font-medium">${item.reason}</td>
                     <td class="p-2 text-sm text-slate-500">${item.account || 'Cash'}</td>
-                    <td class="p-2"><span class="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-sm">${item.category}</span></td>
+                    <td class="p-2"><span class="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-sm">${categoryLabel}</span></td>
                     <td class="p-2 text-slate-500 dark:text-slate-400 text-sm">${item.date}</td>
                     <td class="p-2 text-right font-mono text-emerald-600 dark:text-emerald-400">₹${item.amount.toLocaleString()}</td>
                     <td class="p-2 text-right">
-                        <button onclick="editItem('paid', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100 mr-2"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                        <button onclick="deleteItem('paidExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        <button onclick="editItem('${item.listName === 'paidExpenses' ? 'paid' : 'personal'}', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100 mr-2"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                        <button onclick="deleteItem('${item.listName}', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
                 </tr>`;
             });
@@ -1786,7 +1792,10 @@
                     <div class="flex items-start gap-3">
                         <div class="text-blue-500 font-mono w-6">${sn}.</div>
                         <div>
-                            <span>${item.reason}</span>
+                            <div class="flex items-center gap-2">
+                                <span>${item.reason}</span>
+                                <span class="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300">${item.category || 'Personal'}</span>
+                            </div>
                             <div class="text-sm text-blue-500 dark:text-blue-400">${item.date || ''}</div>
                             <div class="text-sm text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 px-1 rounded inline-block">${item.account || 'Cash'}</div>
                         </div>
@@ -1990,6 +1999,7 @@
             const amount = parseFloat($('#newPersAmount').val());
             const date = $('#newPersDate').val() || new Date().toISOString().split('T')[0];
             const account = $('#newPersAccount').val() || 'Cash';
+            const category = $('#newPersCategory').val() || 'Personal';
 
             if(!reason || !amount) return;
 
@@ -1999,7 +2009,8 @@
                 reason,
                 amount,
                 date: date,
-                account
+                account,
+                category
             });
 
             $('#newPersReason').val('');
@@ -2956,6 +2967,7 @@
                     item.amount = amount;
                     item.date = date;
                     item.account = account;
+                    item.category = category;
                  } else if (type === 'pending') {
                     item.reason = reason;
                     item.amount = amount;

@@ -314,7 +314,7 @@ class DatabaseController:
             income = cursor.fetchall()
             for r in income: r['amount'] = float(r['amount'])
 
-            # 4. Get Paid Expenses
+            # 4. Get Paid Expenses (Excluding daily logs to prevent duplication in frontend arrays)
             query_pe = """
                 SELECT pe.id, pe.reason, pe.amount, pe.expense_date as date,
                        c.category_name as category, a.account_name as account,
@@ -322,7 +322,7 @@ class DatabaseController:
                 FROM paid_expenses pe
                 JOIN categories c ON pe.category_id = c.id
                 LEFT JOIN accounts a ON pe.account_id = a.id
-                WHERE pe.month_id = %s
+                WHERE pe.month_id = %s AND (pe.is_daily_log IS FALSE OR pe.is_daily_log IS NULL)
             """
             cursor.execute(query_pe, (month_id,))
             paid_expenses = cursor.fetchall()
@@ -330,12 +330,14 @@ class DatabaseController:
                 r['amount'] = float(r['amount'])
                 r['date'] = r['date'].strftime('%Y-%m-%d')
 
-            # 5. Get Personal Expenses
+            # 5. Get Personal Expenses (From paid_expenses where is_daily_log=TRUE)
             query_pers = """
-                SELECT p.id, p.reason, p.amount, p.expense_date as date, a.account_name as account
-                FROM personal_expenses p
+                SELECT p.id, p.reason, p.amount, p.expense_date as date,
+                       a.account_name as account, c.category_name as category
+                FROM paid_expenses p
                 JOIN accounts a ON p.account_id = a.id
-                WHERE p.month_id = %s
+                LEFT JOIN categories c ON p.category_id = c.id
+                WHERE p.month_id = %s AND p.is_daily_log = TRUE
             """
             cursor.execute(query_pers, (month_id,))
             personal_expenses = cursor.fetchall()
@@ -411,27 +413,42 @@ class DatabaseController:
 
             # 3. Update Paid Expenses
             # Note: We avoid deleting records that are linked to Long Pending to maintain history integrity
+            # We also ensure we don't accidentally wipe daily logs which are now in this table,
+            # but since we are about to re-insert them, we DO want to wipe them for this month.
             cursor.execute("DELETE FROM paid_expenses WHERE month_id = %s AND is_long_pending = FALSE", (month_id,))
+
+            # Insert standard paid expenses
             for item in data.get('paidExpenses', []):
-                if item.get('isLongPending'): continue # Skip long pending payments as they are managed via specific API
+                if item.get('isLongPending'): continue
                 acc_id = account_map.get(item.get('account'), account_map.get('Cash'))
                 cat_id = category_map.get(item.get('category'))
                 if acc_id and cat_id:
                     cursor.execute("""
-                        INSERT INTO paid_expenses (id, user_id, month_id, account_id, category_id, reason, amount, expense_date)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE reason=VALUES(reason), amount=VALUES(amount)
+                        INSERT INTO paid_expenses (id, user_id, month_id, account_id, category_id, reason, amount, expense_date, is_daily_log)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE)
+                        ON DUPLICATE KEY UPDATE reason=VALUES(reason), amount=VALUES(amount), category_id=VALUES(category_id)
                     """, (str(item['id']), user_id, month_id, acc_id, cat_id, item['reason'], item['amount'], item['date']))
 
-            # 4. Update Personal Expenses
-            cursor.execute("DELETE FROM personal_expenses WHERE month_id = %s", (month_id,))
+            # 4. Update Personal Expenses (Insert as daily_log entries in paid_expenses)
+            # No separate delete needed as step 3 deleted all non-long-pending for the month
             for item in data.get('personalExpenses', []):
                 acc_id = account_map.get(item.get('account'), account_map.get('Cash'))
+                # Handle Category for Daily Logs
+                cat_name = item.get('category', 'Personal') # Default if missing
+                cat_id = category_map.get(cat_name)
+                # If category missing in map, maybe create or default? For now, skip or default.
+                # Since we migrated "Personal", we hope it's there.
+                if not cat_id and 'Personal' in category_map:
+                     cat_id = category_map['Personal']
+
                 if acc_id:
-                    # date might be missing in some personal expense JSON
                     date_val = item.get('date') or datetime.now().strftime('%Y-%m-%d')
-                    cursor.execute("INSERT INTO personal_expenses (id, user_id, month_id, account_id, reason, amount, expense_date) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                                 (str(item['id']), user_id, month_id, acc_id, item['reason'], item['amount'], date_val))
+                    cursor.execute("""
+                        INSERT INTO paid_expenses
+                        (id, user_id, month_id, account_id, category_id, reason, amount, expense_date, is_daily_log)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                        ON DUPLICATE KEY UPDATE reason=VALUES(reason), amount=VALUES(amount), category_id=VALUES(category_id)
+                    """, (str(item['id']), user_id, month_id, acc_id, cat_id, item['reason'], item['amount'], date_val))
 
             # 5. Update Pending Expenses
             cursor.execute("DELETE FROM pending_expenses WHERE month_id = %s AND status = 'pending'", (month_id,))
@@ -612,8 +629,7 @@ class DatabaseController:
                     u.id, u.name, u.email, u.phone, u.registration_method,
                     u.is_active, u.is_admin, u.created_at,
                     (SELECT COUNT(*) FROM months WHERE user_id = u.id) as month_count,
-                    (SELECT COUNT(*) FROM paid_expenses WHERE user_id = u.id) +
-                    (SELECT COUNT(*) FROM personal_expenses WHERE user_id = u.id) as total_transactions
+                    (SELECT COUNT(*) FROM paid_expenses WHERE user_id = u.id) as total_transactions
                 FROM users u
                 ORDER BY u.created_at DESC
             """
@@ -681,18 +697,14 @@ class DatabaseController:
 
             # Sum of ALL expenses (Paid + Personal)
             cursor.execute("""
-                SELECT
-                    (SELECT COALESCE(SUM(amount), 0) FROM paid_expenses) +
-                    (SELECT COALESCE(SUM(amount), 0) FROM personal_expenses) as total
+                SELECT COALESCE(SUM(amount), 0) as total FROM paid_expenses
             """)
             res = cursor.fetchone()['total']
             stats['total_expenditure'] = float(res) if res else 0.0
 
             # Total Transactions count
             cursor.execute("""
-                SELECT
-                    (SELECT COUNT(*) FROM paid_expenses) +
-                    (SELECT COUNT(*) FROM personal_expenses) as total
+                SELECT COUNT(*) as total FROM paid_expenses
             """)
             stats['total_transactions'] = cursor.fetchone()['total']
 

@@ -150,6 +150,7 @@ CREATE TABLE paid_expenses (
     amount DECIMAL(15, 2) NOT NULL,
     expense_date DATE NOT NULL,
     is_long_pending BOOLEAN DEFAULT FALSE COMMENT 'Whether this came from long pending',
+    is_daily_log BOOLEAN DEFAULT FALSE COMMENT 'Whether this is a daily/personal expense log',
     linked_long_pending_id VARCHAR(100) DEFAULT NULL COMMENT 'Reference to long_pending if applicable',
     notes TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -166,31 +167,6 @@ CREATE TABLE paid_expenses (
     INDEX idx_expense_date (expense_date),
     INDEX idx_is_long_pending (is_long_pending)
 ) ENGINE=InnoDB COMMENT='Paid/completed expense entries';
-
--- ============================================
--- PERSONAL/DAILY EXPENSES TABLE
--- Daily personal expense entries
--- ============================================
-CREATE TABLE personal_expenses (
-    id VARCHAR(100) PRIMARY KEY COMMENT 'Unique ID (timestamp-based from JSON)',
-    user_id VARCHAR(50) NOT NULL,
-    month_id INT NOT NULL,
-    account_id INT NOT NULL,
-    reason VARCHAR(255) NOT NULL COMMENT 'Expense item (e.g., Rapido, Grocery)',
-    amount DECIMAL(15, 2) NOT NULL,
-    expense_date DATE NOT NULL,
-    notes TEXT DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (month_id) REFERENCES months(id) ON DELETE CASCADE,
-    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
-    INDEX idx_user_id (user_id),
-    INDEX idx_month_id (month_id),
-    INDEX idx_account_id (account_id),
-    INDEX idx_expense_date (expense_date)
-) ENGINE=InnoDB COMMENT='Personal/daily expense entries';
 
 -- ============================================
 -- PENDING EXPENSES TABLE
@@ -366,11 +342,11 @@ LEFT JOIN (
 ) inc ON m.id = inc.month_id
 LEFT JOIN (
     SELECT month_id, SUM(amount) AS total_paid
-    FROM paid_expenses GROUP BY month_id
+    FROM paid_expenses WHERE is_daily_log = FALSE OR is_daily_log IS NULL GROUP BY month_id
 ) pe ON m.id = pe.month_id
 LEFT JOIN (
     SELECT month_id, SUM(amount) AS total_personal
-    FROM personal_expenses GROUP BY month_id
+    FROM paid_expenses WHERE is_daily_log = TRUE GROUP BY month_id
 ) pers ON m.id = pers.month_id
 LEFT JOIN (
     SELECT month_id, SUM(amount) AS total_pending
@@ -400,11 +376,11 @@ LEFT JOIN (
 ) inc ON m.id = inc.month_id AND a.id = inc.account_id
 LEFT JOIN (
     SELECT month_id, account_id, SUM(amount) AS total_paid
-    FROM paid_expenses GROUP BY month_id, account_id
+    FROM paid_expenses WHERE is_daily_log = FALSE OR is_daily_log IS NULL GROUP BY month_id, account_id
 ) pe ON m.id = pe.month_id AND a.id = pe.account_id
 LEFT JOIN (
     SELECT month_id, account_id, SUM(amount) AS total_personal
-    FROM personal_expenses GROUP BY month_id, account_id
+    FROM paid_expenses WHERE is_daily_log = TRUE GROUP BY month_id, account_id
 ) pers ON m.id = pers.month_id AND a.id = pers.account_id
 WHERE a.user_id = m.user_id;
 
@@ -636,7 +612,6 @@ INSERT INTO categories (user_id, category_name, category_type) VALUES
 
 -- For date-range queries on expenses
 CREATE INDEX idx_paid_expenses_date_range ON paid_expenses (user_id, expense_date);
-CREATE INDEX idx_personal_expenses_date_range ON personal_expenses (user_id, expense_date);
 
 -- For category analysis
 CREATE INDEX idx_paid_expenses_category_analysis ON paid_expenses (user_id, month_id, category_id, amount);
