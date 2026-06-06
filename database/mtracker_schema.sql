@@ -272,7 +272,16 @@ CREATE TABLE notes (
 ) ENGINE=InnoDB COMMENT='User notes per month';
 
 -- ============================================
--- USER SETTINGS TABLE
+-- SYSTEM SETTINGS TABLE
+    -- Global system settings like SMTP
+    -- ============================================
+    CREATE TABLE system_settings (
+    setting_key VARCHAR(50) PRIMARY KEY,
+    setting_value VARCHAR(255)
+    ) ENGINE=InnoDB COMMENT='Global system settings like SMTP';
+
+    -- ============================================
+    -- USER SETTINGS TABLE
 -- User preferences and settings
 -- ============================================
 CREATE TABLE user_settings (

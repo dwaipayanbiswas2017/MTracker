@@ -35,6 +35,127 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = None # Disable default login message
 
+import smtplib
+from email.message import EmailMessage
+
+# --- Email Utility ---
+
+def send_email(subject, recipient, body, html_body=None):
+    """
+    Sends an email using settings fetched dynamically from the database.
+    Uses smtplib directly for reliable dynamic configuration.
+    """
+    settings = db.get_all_system_settings()
+    
+    if not settings.get('smtp_server') or not settings.get('sender_email'):
+        print("[WARN] Email settings not configured. Falling back to console log.")
+        print(f"[MOCK EMAIL] To: {recipient}\nSubject: {subject}\nBody: {body}")
+        return False
+
+    try:
+        # Get and validate port
+        smtp_port = settings.get('smtp_port')
+        try:
+            port = int(smtp_port) if smtp_port and str(smtp_port).strip() else 587
+        except (ValueError, TypeError):
+            port = 587
+
+        # Determine security protocol based on port
+        use_ssl = (port == 465)
+        use_tls = (port == 587 or settings.get('smtp_use_tls') == 'True') and not use_ssl
+
+        print(f"[DEBUG] Attempting to send email to {recipient}")
+        print(f"[DEBUG] SMTP Server: {settings.get('smtp_server')}:{port}")
+        print(f"[DEBUG] Use TLS: {use_tls}, Use SSL: {use_ssl}")
+
+        # Create message
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = settings.get('sender_email')
+        msg['To'] = recipient
+        msg.set_content(body)
+
+        if html_body:
+            msg.add_alternative(html_body, subtype='html')
+
+        # Send using smtplib
+        if use_ssl:
+            with smtplib.SMTP_SSL(settings.get('smtp_server'), port, timeout=10) as server:
+                server.login(settings.get('smtp_username'), settings.get('smtp_password'))
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(settings.get('smtp_server'), port, timeout=10) as server:
+                if use_tls:
+                    server.starttls()
+                if settings.get('smtp_username'):
+                    server.login(settings.get('smtp_username'), settings.get('smtp_password'))
+                server.send_message(msg)
+        
+        print(f"[DEBUG] Email sent successfully to {recipient}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to send email to {recipient}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def get_otp_template(otp, user_name="User", purpose="Verification"):
+    """
+    Returns a professional HTML template for OTP emails.
+    """
+    bg_color = "#f8fafc"
+    card_bg = "#ffffff"
+    brand_color = "#2563eb"
+    text_color = "#1e293b"
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: {bg_color}; margin: 0; padding: 0; }}
+            .container {{ max-width: 600px; margin: 40px auto; padding: 20px; }}
+            .card {{ background-color: {card_bg}; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }}
+            .header {{ text-align: center; margin-bottom: 30px; }}
+            .logo {{ color: {brand_color}; font-size: 24px; font-weight: bold; text-decoration: none; }}
+            .title {{ font-size: 20px; font-weight: 600; color: {text_color}; margin-bottom: 10px; }}
+            .message {{ color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 30px; }}
+            .otp-container {{ background-color: #f1f5f9; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 30px; letter-spacing: 8px; }}
+            .otp-code {{ font-size: 32px; font-weight: 800; color: {brand_color}; margin: 0; }}
+            .footer {{ text-align: center; font-size: 12px; color: #94a3b8; margin-top: 20px; }}
+            .warning {{ font-size: 13px; color: #94a3b8; border-top: 1px solid #f1f5f9; pt: 20px; margin-top: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="card">
+                <div class="header">
+                    <span class="logo">M<span style="color: #64748b;">Tracker</span></span>
+                </div>
+                <div class="title">Hello {user_name},</div>
+                <div class="message">
+                    We received a request for <b>{purpose}</b> on your MTracker account. 
+                    Please use the following code to complete the process:
+                </div>
+                <div class="otp-container">
+                    <div class="otp-code">{otp}</div>
+                </div>
+                <div class="message" style="margin-bottom: 10px;">
+                    This code will expire in <b>5 minutes</b>.
+                </div>
+                <div class="warning">
+                    If you did not request this code, you can safely ignore this email. Someone might have entered your email address by mistake.
+                </div>
+            </div>
+            <div class="footer">
+                &copy; 2026 MTracker Systems. All rights reserved.<br>
+                This is an automated security notification.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
 # --- User Management ---
 
 class User(UserMixin):
@@ -98,6 +219,77 @@ def parse_month_date(date_str):
             pass
 
     return None
+
+# --- Forgot Password Routes ---
+
+@app.route('/forgot_password')
+def forgot_password():
+    return render_template('forgot_password.html')
+
+@app.route('/api/forgot_password/send', methods=['POST'])
+def forgot_password_send_otp():
+    identifier = request.json.get('identifier')
+    if not identifier:
+        return jsonify({"status": "error", "message": "Email or Phone is required"}), 400
+
+    user_data = db.get_user_by_identifier(identifier)
+    if not user_data:
+        return jsonify({"status": "error", "message": "User not found"}), 404
+
+    otp = str(random.randint(100000, 999999))
+    otp_storage[identifier] = {
+        "otp": otp,
+        "expiry": time.time() + 300,
+        "user_id": user_data['id']
+    }
+
+    if '@' in identifier:
+        html_body = get_otp_template(otp, user_data['name'], "Password Recovery")
+        success = send_email(
+            "MTracker - Password Recovery",
+            identifier,
+            f"Hello {user_data['name']},\n\nYour password recovery code is: {otp}\nThis code will expire in 5 minutes.",
+            html_body=html_body
+        )
+        if success:
+            return jsonify({"status": "success", "message": "Recovery code sent to your email."})
+        else:
+            return jsonify({"status": "error", "message": "Failed to send email. Please try again later."}), 500
+    else:
+        # SMS Mocking
+        print(f"[MOCK SMS] Recovery OTP {otp} sent to {identifier}")
+        return jsonify({"status": "success", "message": "Recovery code sent via SMS (Mocked).", "otp_mock": otp})
+
+@app.route('/api/forgot_password/reset', methods=['POST'])
+def forgot_password_reset():
+    data = request.json
+    identifier = data.get('identifier')
+    otp = data.get('otp')
+    new_password = data.get('new_password')
+
+    if not all([identifier, otp, new_password]):
+        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
+    stored_otp_data = otp_storage.get(identifier)
+    if not stored_otp_data:
+        return jsonify({"status": "error", "message": "Invalid or expired code. Please request a new one."}), 400
+
+    if time.time() > stored_otp_data['expiry']:
+        del otp_storage[identifier]
+        return jsonify({"status": "error", "message": "Code has expired. Please request a new one."}), 400
+
+    if stored_otp_data['otp'] != otp:
+        return jsonify({"status": "error", "message": "Incorrect recovery code."}), 400
+
+    # OTP is valid, reset password
+    user_id = stored_otp_data['user_id']
+    hashed_password = generate_password_hash(new_password)
+    
+    if db.update_user_password(user_id, hashed_password):
+        del otp_storage[identifier]
+        return jsonify({"status": "success", "message": "Password reset successful. You can now login."})
+    else:
+        return jsonify({"status": "error", "message": "Failed to update password. Please try again."}), 500
 
 # --- Auth Routes ---
 
@@ -650,6 +842,81 @@ def admin_delete_user(user_id):
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Could not delete user"}), 500
 
+# --- Admin Settings API ---
+
+@app.route('/api/admin/settings/mail', methods=['GET'])
+@login_required
+def get_mail_settings():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+    
+    settings = db.get_all_system_settings()
+    # Mask password for security
+    if settings.get('smtp_password'):
+        settings['smtp_password'] = '********'
+    
+    return jsonify(settings)
+
+@app.route('/api/admin/settings/mail', methods=['POST'])
+@login_required
+def update_mail_settings():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+    
+    data = request.json
+    keys = ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_use_tls', 'sender_email']
+    
+    for key in keys:
+        if key in data:
+            # Don't overwrite password if it's masked or empty
+            if key == 'smtp_password' and (data[key] == '********' or not data[key]):
+                continue
+            db.update_system_setting(key, str(data[key]))
+            
+    return jsonify({"status": "success", "message": "Mail settings updated successfully"})
+
+@app.route('/api/admin/settings/mail/test', methods=['POST'])
+@login_required
+def test_mail_settings():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+    
+    test_subject = "MTracker - SMTP Test Connection"
+    test_body = f"Hello {current_user.name},\n\nThis is a test email from MTracker to verify your SMTP configuration."
+    
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            .card {{ font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; text-align: center; }}
+            .status {{ color: #059669; font-weight: bold; font-size: 24px; margin: 20px 0; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2 style="color: #2563eb;">MTracker SMTP Test</h2>
+            <div class="status">✓ Connection Successful</div>
+            <p>Hello <b>{current_user.name}</b>,</p>
+            <p>Your SMTP configuration has been verified successfully.</p>
+            <p style="color: #64748b; font-size: 12px; margin-top: 30px;">Sent at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    success = send_email(
+        test_subject,
+        current_user.email or "admin@mtracker.com",
+        test_body,
+        html_body=html_body
+    )
+    
+    if success:
+        return jsonify({"status": "success", "message": "Test email sent successfully to your registered email."})
+    else:
+        return jsonify({"status": "error", "message": "Failed to send test email. Please check your SMTP settings and terminal logs."}), 500
+
 # --- Jinja Filters ---
 
 @app.template_filter('format_currency')
@@ -699,12 +966,18 @@ def send_otp():
     targets = []
     if new_identifier:
         # If updating, send ONLY to the new one
-        print(f"[MOCK] Sending Verification OTP {otp} to NEW identifier: {new_identifier}")
-        targets.append("New Entry")
+        if '@' in new_identifier:
+            html_body = get_otp_template(otp, current_user.name, "Identity Verification")
+            send_email("MTracker - Verification Code", new_identifier, f"Your verification code is: {otp}. It will expire in 5 minutes.", html_body=html_body)
+            targets.append("Email")
+        else:
+            print(f"[MOCK] Sending Verification OTP {otp} to NEW identifier: {new_identifier}")
+            targets.append("SMS")
     else:
         # If just verifying for password change, send to existing
         if current_user.email:
-            print(f"[MOCK] Sending OTP {otp} to Email: {current_user.email}")
+            html_body = get_otp_template(otp, current_user.name, "Security Verification")
+            send_email("MTracker - Security Code", current_user.email, f"Your security code is: {otp}. It will expire in 5 minutes.", html_body=html_body)
             targets.append("Email")
         if current_user.phone:
             print(f"[MOCK] Sending OTP {otp} to SMS: {current_user.phone}")
@@ -741,7 +1014,7 @@ def verify_otp():
         session['pwd_verified_via_otp'] = True
         return jsonify({"status": "success", "message": "Verification successful", "type": "password_verification"})
 
-    return jsonify({"status": "error", "message": "Invalid OTP"})
+    return jsonify({"status": "error", "message": "Invalid OTP"}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

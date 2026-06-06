@@ -8,10 +8,11 @@ MTracker is a professional personal finance management application designed to h
 -   **Monthly Tracking**: Create and manage monthly budgets and transactions.
 -   **Expense Categorization**: Categorize your expenses (e.g., Food, Bills, EMI) with full CRUD support.
 -   **Long Pending Payments**: Track and manage long-term debts with partial payment support linked to monthly cycles.
+-   **Password Recovery**: Secure password reset flow using OTP verification via email for lost credentials.
 -   **CSV Import**: Batch import transaction data from CSV files for rapid entry.
 -   **PDF Export**: Generate professional monthly statements in PDF format with automatic charts.
 -   **Profile Management**: Update profile pictures, manage contact info with OTP verification, and set currency/account preferences.
--   **Admin Panel**: System-wide oversight, user management (activate/deactivate/promote), and global statistics.
+-   **Admin Panel & System Settings**: Global oversight with user management and system-wide configuration (e.g., SMTP settings) via a dedicated dashboard.
 -   **Modern Dynamic UI**: Clean, tactile interface with a consistent theme engine supporting Light and Dark modes.
 -   **Secure Authentication**: Role-based access control with secure password hashing and dual-identifier (Email/Phone) login.
 
@@ -21,6 +22,9 @@ MTracker is a professional personal finance management application designed to h
 -   **`/login`**: Secure login (GET/POST).
 -   **`/register`**: New user registration (GET/POST).
 -   **`/logout`**: Session termination (GET).
+-   **`/forgot_password`**: Password recovery initiation (GET).
+-   **`/api/forgot_password/send`**: Send OTP for password reset (POST).
+-   **`/api/forgot_password/verify`**: Verify OTP and update password (POST).
 -   **`/api/verify_password`**: Internal identity verification (POST).
 -   **`/api/send_otp`**: OTP generation for contact updates or security (POST).
 -   **`/api/verify_otp`**: OTP verification for sensitive profile changes (POST).
@@ -43,18 +47,20 @@ MTracker is a professional personal finance management application designed to h
 -   **`/api/long_pending/<item_id>`**: Remove a debt track (DELETE).
 -   **`/api/long_pending/<item_id>/partial_payment`**: Record partial debt clearances (POST).
 
-### Administration
+### Administration & Settings
 -   **`/admin`**: Global dashboard overview for system administrators (GET).
 -   **`/admin/toggle_user/<user_id>`**: Enable/Disable system access (POST).
 -   **`/admin/toggle_admin/<user_id>`**: Promote/Demote administrative rights (POST).
 -   **`/admin/delete_user/<user_id>`**: Permanent cascading deletion of user data (POST).
+-   **`/api/admin/settings/mail`**: Manage system-wide SMTP settings (GET/POST).
+-   **`/api/admin/settings/mail/test`**: Verify SMTP configuration with a test email (POST).
 
 ## Tech Stack
 
 -   **Backend**: Python 3.x, Flask (Web Framework)
 -   **Frontend**: HTML5, Tailwind CSS (Styling), jQuery (AJAX & DOM), Lucide (Icons)
 -   **Database**: MySQL 8.0+ (Transactions, Users, Persistent State)
--   **Authentication**: Flask-Login, Werkzeug (Security)
+-   **Authentication & Mail**: Flask-Login, Flask-Mail, Werkzeug (Security)
 
 ## Setup & Installation
 
@@ -74,7 +80,10 @@ MTracker is a professional personal finance management application designed to h
     ```
 
 3.  **Install dependencies**:
+    It is recommended to use a virtual environment:
     ```bash
+    python3 -m venv venv
+    source venv/bin/activate
     pip install -r requirements.txt
     ```
 
@@ -82,12 +91,50 @@ MTracker is a professional personal finance management application designed to h
     Initialize your MySQL database using the schema provided in `database/mtracker_schema.sql`.
 
 5.  **Run the application**:
+    For development:
     ```bash
     python app.py
     ```
+    For production, use Gunicorn:
+    ```bash
+    gunicorn --bind 0.0.0.0:5000 app:app
+    ```
 
-6.  **Access the Registry**:
-    Visit `http://localhost:5000` to register your first administrative or user account.
+## Production Deployment (Auto-start on Boot)
+
+To ensure MTracker starts automatically on boot, a `systemd` service is provided:
+
+1.  **Prepare User-level Service Directory**:
+    ```bash
+    mkdir -p ~/.config/systemd/user/
+    ```
+
+2.  **Copy Service File**:
+    ```bash
+    cp mtracker.service ~/.config/systemd/user/
+    ```
+
+3.  **Enable and Start Service**:
+    ```bash
+    systemctl --user daemon-reload
+    systemctl --user enable mtracker.service
+    systemctl --user start mtracker.service
+    ```
+
+4.  **Enable Lingering**:
+    To allow the service to run without an active session:
+    ```bash
+    loginctl enable-linger $USER
+    ```
+
+5.  **Check Status**:
+    ```bash
+    systemctl --user status mtracker.service
+    ```
+
+## Initial Configuration
+    - Visit `http://localhost:5000` to register.
+    - If you are an admin, configure SMTP settings in the Admin Panel to enable email features like OTP and Password Recovery.
 
 ## Usage
 

@@ -976,9 +976,15 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1">Select Account</label>
-                    <select id="payPendingAccount" class="input-dark w-full">
+                    <select id="payPendingAccount" class="input-dark w-full mb-4">
                         <!-- Options -->
                     </select>
+                    
+                    <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1">Confirm Amount</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                        <input type="number" id="payPendingAmount" class="input-dark w-full pl-8" step="0.01">
+                    </div>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="closePayPendingModal()" class="w-full py-2 bg-white dark:bg-slate-700 text-slate-700 dark:text-white rounded-lg font-bold border border-slate-300 dark:border-slate-500 shadow-sm active:translate-y-0.5 transition-all">Cancel</button>
@@ -1468,7 +1474,18 @@
                         sel.append(`<option value="${m}">${displayName}</option>`);
                         selMobile.append(`<option value="${m}">${displayName}</option>`);
                     });
-                    loadMonthData(months[0]); // Load first
+                    
+                    // Default to current month if available
+                    const now = new Date();
+                    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                    
+                    if (months.includes(currentMonthStr)) {
+                        sel.val(currentMonthStr);
+                        selMobile.val(currentMonthStr);
+                        loadMonthData(currentMonthStr);
+                    } else {
+                        loadMonthData(months[0]); // Fallback to first
+                    }
                 }
             }).fail(function(xhr) {
                 if (xhr.status === 401) window.location.href = '/login';
@@ -1530,6 +1547,7 @@
 
         function renderUI() {
             if (!currentData) return;
+            let rowIndex = 0;
 
             // --- Backward compatibility for income ---
             if (typeof currentData.income === 'number' || !currentData.income) {
@@ -2074,7 +2092,8 @@
 
             pendingItemToPay = item;
 
-            $('#payPendingReason').text(`Paying: ${item.reason} (₹${item.amount})`);
+            $('#payPendingReason').text(`Paying: ${item.reason}`);
+            $('#payPendingAmount').val(item.amount);
 
             // Populate accounts
             const options = accounts.map(a => `<option value="${a.account_name}">${a.account_name}</option>`).join('');
@@ -2105,8 +2124,15 @@
             if (!pendingItemToPay) return;
 
             const account = $('#payPendingAccount').val();
+            const finalAmount = parseFloat($('#payPendingAmount').val()) || 0;
+
             if (!account) {
                 alert("Please select an account");
+                return;
+            }
+
+            if (finalAmount <= 0) {
+                alert("Please enter a valid amount");
                 return;
             }
 
@@ -2119,7 +2145,7 @@
                 id: Date.now(),
                 reason: pendingItemToPay.reason,
                 category: pendingItemToPay.category,
-                amount: pendingItemToPay.amount,
+                amount: finalAmount,
                 date: new Date().toISOString().split('T')[0],
                 account: account
             });
