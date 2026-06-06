@@ -239,83 +239,136 @@
             </div>
         </div>
 
-        <!-- User Management Table -->
-        <div class="card overflow-hidden">
-            <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                <h2 class="text-lg font-bold">User Management</h2>
-                <div class="text-xs text-slate-500">Total: {{ users|length }} users</div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Mail Configuration Section -->
+            <div class="card p-6 border-l-4 border-l-purple-500 h-full">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                        <i data-lucide="mail"></i>
+                    </div>
+                    <h3 class="text-lg font-bold">Mail Configuration</h3>
+                </div>
+                
+                <form id="mailSettingsForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">SMTP Server</label>
+                        <input type="text" name="smtp_server" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 w-full text-sm outline-none focus:border-purple-500" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">SMTP Port</label>
+                            <input type="number" name="smtp_port" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 w-full text-sm outline-none focus:border-purple-500" placeholder="587">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Use TLS</label>
+                            <div class="flex items-center h-10">
+                                <input type="checkbox" name="smtp_use_tls" value="True" class="w-4 h-4 rounded border-slate-300 accent-purple-600">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Username</label>
+                        <input type="text" name="smtp_username" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 w-full text-sm outline-none focus:border-purple-500" placeholder="your-email@gmail.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                        <input type="password" name="smtp_password" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 w-full text-sm outline-none focus:border-purple-500" placeholder="********">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Sender Email</label>
+                        <input type="email" name="sender_email" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 w-full text-sm outline-none focus:border-purple-500" placeholder="noreply@mtracker.com">
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="button" id="testEmailBtn" class="flex-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-bold py-2.5 rounded shadow active:translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                            Test Connection
+                        </button>
+                        <button type="submit" class="flex-[2] bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded shadow-lg active:translate-y-0.5 transition-all text-sm">
+                            Save Configuration
+                        </button>
+                    </div>
+                </form>
             </div>
 
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>User Details</th>
-                            <th>Status</th>
-                            <th>Reg. Date</th>
-                            <th>Activity</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr class="hover:bg-slate-500/5 transition-colors">
-                            <td>
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500">
-                                        {{ user.name[0]|upper }}
-                                    </div>
-                                    <div>
-                                        <div class="font-bold">
-                                            {{ user.name }}
-                                            {% if user.is_admin %}
-                                            <span class="ml-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 rounded uppercase">Admin</span>
-                                            {% endif %}
+            <!-- User Management Table (Span 2 columns) -->
+            <div class="lg:col-span-2 card overflow-hidden border-l-4 border-l-blue-500">
+                <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <h2 class="text-lg font-bold">User Management</h2>
+                    <div class="text-xs text-slate-500 font-bold uppercase tracking-wider">Active: {{ stats.active_users }} / Total: {{ stats.total_users }}</div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User Details</th>
+                                <th>Status</th>
+                                <th>Reg. Date</th>
+                                <th>Activity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr class="hover:bg-slate-500/5 transition-colors">
+                                <td>
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500">
+                                            {{ user.name[0]|upper }}
                                         </div>
-                                        <div class="text-xs text-slate-500">
-                                            {% if user.email %}{{ user.email }}{% else %}{{ user.phone }}{% endif %}
+                                        <div>
+                                            <div class="font-bold">
+                                                {{ user.name }}
+                                                {% if user.is_admin %}
+                                                <span class="ml-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 rounded uppercase">Admin</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-xs text-slate-500">
+                                                {% if user.email %}{{ user.email }}{% else %}{{ user.phone }}{% endif %}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </td>
-                            <td>
-                                {% if user.is_active %}
-                                <span class="flex items-center gap-1.5 text-xs text-green-500 font-medium">
-                                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                                    Active
-                                </span>
-                                {% else %}
-                                <span class="flex items-center gap-1.5 text-xs text-rose-500 font-medium">
-                                    <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                                    Deactivated
-                                </span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="text-xs font-medium">{{ user.created_at }}</div>
-                                <div class="text-[10px] text-slate-500">via {{ user.registration_method }}</div>
-                            </td>
-                            <td>
-                                <div class="text-xs font-bold">{{ user.month_count }} Months</div>
-                                <div class="text-[10px] text-slate-500">{{ user.total_transactions }} Transactions</div>
-                            </td>
-                            <td>
-                                <div class="flex gap-2">
-                                    <button onclick="toggleAdmin('{{ user.id }}', '{{ user.name }}', {{ 'true' if user.is_admin else 'false' }})" class="btn-action {% if user.is_admin %}text-blue-500 bg-blue-500/10 hover:bg-blue-500/20{% else %}text-slate-500 bg-slate-500/10 hover:bg-slate-500/20{% endif %}" title="{% if user.is_admin %}Demote from Admin{% else %}Promote to Admin{% endif %}">
-                                        <i data-lucide="shield{% if user.is_admin %}-off{% endif %}" class="w-4 h-4"></i>
-                                    </button>
-                                    <button onclick="toggleUser('{{ user.id }}', '{{ user.name }}')" class="btn-action {% if user.is_active %}text-orange-500 bg-orange-500/10 hover:bg-orange-500/20{% else %}text-green-500 bg-green-500/10 hover:bg-green-500/20{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Reactivate{% endif %}">
-                                        <i data-lucide="{% if user.is_active %}user-minus{% else %}user-plus{% endif %}" class="w-4 h-4"></i>
-                                    </button>
-                                    <button onclick="deleteUser('{{ user.id }}', '{{ user.name }}')" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete Permanently">
-                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                </td>
+                                <td>
+                                    {% if user.is_active %}
+                                    <span class="flex items-center gap-1.5 text-xs text-green-500 font-medium">
+                                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                        Active
+                                    </span>
+                                    {% else %}
+                                    <span class="flex items-center gap-1.5 text-xs text-rose-500 font-medium">
+                                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                        Deactivated
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="text-xs font-medium">{{ user.created_at }}</div>
+                                    <div class="text-[10px] text-slate-500">via {{ user.registration_method }}</div>
+                                </td>
+                                <td>
+                                    <div class="text-xs font-bold">{{ user.month_count }} Months</div>
+                                    <div class="text-[10px] text-slate-500">{{ user.total_transactions }} Transactions</div>
+                                </td>
+                                <td>
+                                    <div class="flex gap-2">
+                                        <button onclick="toggleAdmin('{{ user.id }}', '{{ user.name }}', {{ 'true' if user.is_admin else 'false' }})" class="btn-action {% if user.is_admin %}text-blue-500 bg-blue-500/10 hover:bg-blue-500/20{% else %}text-slate-500 bg-slate-500/10 hover:bg-slate-500/20{% endif %}" title="{% if user.is_admin %}Demote from Admin{% else %}Promote to Admin{% endif %}">
+                                            <i data-lucide="shield{% if user.is_admin %}-off{% endif %}" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="toggleUser('{{ user.id }}', '{{ user.name }}')" class="btn-action {% if user.is_active %}text-orange-500 bg-orange-500/10 hover:bg-orange-500/20{% else %}text-green-500 bg-green-500/10 hover:bg-green-500/20{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Reactivate{% endif %}">
+                                            <i data-lucide="{% if user.is_active %}user-minus{% else %}user-plus{% endif %}" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="deleteUser('{{ user.id }}', '{{ user.name }}')" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete Permanently">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -384,6 +437,7 @@
     <script>
         $(document).ready(function() {
             lucide.createIcons();
+            loadMailSettings();
 
             // Theme initialization
             if (localStorage.getItem('theme') === 'dark') {
@@ -392,7 +446,81 @@
                 $('#theme-icon, #theme-icon-mobile').attr('data-lucide', 'sun');
             }
             lucide.createIcons();
+
+            // Mail settings form submission
+            $('#mailSettingsForm').submit(function(e) {
+                e.preventDefault();
+                const formData = {};
+                $(this).serializeArray().forEach(item => {
+                    formData[item.name] = item.value;
+                });
+                // Handle checkbox manually
+                formData['smtp_use_tls'] = $(this).find('input[name="smtp_use_tls"]').is(':checked') ? 'True' : 'False';
+
+                $.ajax({
+                    url: '/api/admin/settings/mail',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function(res) {
+                        showToast(res.message);
+                        loadMailSettings(); // Reload to refresh masked password
+                    },
+                    error: function(xhr) {
+                        showToast(xhr.responseJSON.message || "Error saving settings", true);
+                    }
+                });
+            });
+
+            // Test Email connectivity
+            $('#testEmailBtn').click(function() {
+                const btn = $(this);
+                const originalHtml = btn.html();
+                btn.prop('disabled', true).html('<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Testing...');
+                lucide.createIcons();
+
+                $.ajax({
+                    url: '/api/admin/settings/mail/test',
+                    type: 'POST',
+                    success: function(res) {
+                        showToast(res.message);
+                        btn.prop('disabled', false).html(originalHtml);
+                        lucide.createIcons();
+                    },
+                    error: function(xhr) {
+                        showToast(xhr.responseJSON.message || "Email test failed", true);
+                        btn.prop('disabled', false).html(originalHtml);
+                        lucide.createIcons();
+                    }
+                });
+            });
         });
+
+        function loadMailSettings() {
+            $.get('/api/admin/settings/mail', function(data) {
+                const form = $('#mailSettingsForm');
+                for (const key in data) {
+                    const input = form.find(`[name="${key}"]`);
+                    if (input.attr('type') === 'checkbox') {
+                        input.prop('checked', data[key] === 'True');
+                    } else {
+                        input.val(data[key]);
+                    }
+                }
+            });
+        }
+
+        function showToast(message, isError = false) {
+            const toast = $('#toast');
+            $('#toastMsg').text(message);
+            if (isError) toast.addClass('bg-rose-600').removeClass('bg-slate-800');
+            else toast.removeClass('bg-rose-600').addClass('bg-slate-800');
+            
+            toast.removeClass('opacity-0').addClass('opacity-100');
+            setTimeout(() => {
+                toast.removeClass('opacity-100').addClass('opacity-0');
+            }, 3000);
+        }
 
         function toggleTheme() {
             const html = $('html');

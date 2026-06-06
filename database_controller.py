@@ -58,6 +58,24 @@ class DatabaseController:
         finally:
             conn.close()
 
+    def update_user_password(self, user_id, hashed_password):
+        """
+        Updates a user's password.
+        """
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            query = "UPDATE users SET password_hash = %s WHERE id = %s"
+            cursor.execute(query, (hashed_password, user_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f"Error updating password: {e}")
+            return False
+        finally:
+            conn.close()
+
     def is_identifier_available(self, identifier, exclude_user_id=None):
         """
         Checks if an email or phone number is already in use by another user.
@@ -709,5 +727,46 @@ class DatabaseController:
             stats['total_transactions'] = cursor.fetchone()['total']
 
             return stats
+        finally:
+            conn.close()
+
+    # --- System Settings ---
+
+    def get_system_setting(self, key, default=None):
+        """Retrieves a specific system setting by key."""
+        conn = self.get_connection()
+        if not conn: return default
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT setting_value FROM system_settings WHERE setting_key = %s", (key,))
+            row = cursor.fetchone()
+            return row[0] if row else default
+        finally:
+            conn.close()
+
+    def update_system_setting(self, key, value):
+        """Updates or creates a system setting."""
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            query = "INSERT INTO system_settings (setting_key, setting_value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+            cursor.execute(query, (key, value))
+            conn.commit()
+            return True
+        except Error as e:
+            print(f"Error updating system setting: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_all_system_settings(self):
+        """Retrieves all global system settings."""
+        conn = self.get_connection()
+        if not conn: return {}
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT setting_key, setting_value FROM system_settings")
+            return {row[0]: row[1] for row in cursor.fetchall()}
         finally:
             conn.close()
