@@ -116,6 +116,11 @@
                     <span class="font-medium">Dashboard</span>
                 </a>
 
+                <a href="/chat" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="AI Assistant">
+                    <i data-lucide="bot" class="w-4 h-4"></i>
+                    <span class="font-medium">Chat</span>
+                </a>
+
                 <button id="theme-toggle" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="Toggle Theme">
                     <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
                 </button>
@@ -139,6 +144,10 @@
                         <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
                             Profile Settings
+                        </a>
+                        <a href="/chat" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
+                            AI Assistant
                         </a>
                         <div class="border-t border-slate-200 dark:border-slate-700 my-1"></div>
                         <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
@@ -173,6 +182,10 @@
                         <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
                             Profile
+                        </a>
+                        <a href="/chat" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
+                            Chat
                         </a>
                         <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                             <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -651,5 +664,6 @@
             });
         }
     </script>
+{% include 'chat_widget.html' %}
 </body>
 </html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - MTracker</title>
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { colors: { darkbg: '#0f172a', cardbg: '#1e293b', brand: '#2563eb' } } } }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root { --bg: #f8fafc; --text: #0f172a; --card: #ffffff; --input: #ffffff; --input-border: #cbd5e1; --input-text: #0f172a; --border: #e2e8f0; }
+        .dark { --bg: #0f172a; --text: #f1f5f9; --card: #1e293b; --input: #1e293b; --input-border: #334155; --input-text: #f1f5f9; --border: #334155; }
+        body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: .75rem; }
+        .inp { background: var(--input); border: 1px solid var(--input-border); color: var(--input-text); padding: .625rem .75rem; border-radius: .5rem; width: 100%; outline: none; }
+        .inp:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+        #chatMessages { scroll-behavior: smooth; scrollbar-width: thin; }
+        .bub { max-width: 78%; line-height: 1.45; }
+        .bub.user { background: #2563eb; color: #fff; border-radius: 1rem 1rem .25rem 1rem; }
+        .dark .bub.user { background: #1d4ed8; }
+        .bub.agent { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 1rem 1rem 1rem .25rem; }
+        .bub.agent .markdown h1, .bub.agent .markdown h2, .bub.agent .markdown h3 { font-weight: 600; margin: .5em 0 .25em; }
+        .bub.agent .markdown h1 { font-size: 1.1rem; }
+        .bub.agent .markdown h2 { font-size: 1rem; }
+        .bub.agent .markdown h3 { font-size: .925rem; }
+        .bub.agent .markdown p { margin: .25em 0; }
+        .bub.agent .markdown p:first-child { margin-top: 0; }
+        .bub.agent .markdown p:last-child { margin-bottom: 0; }
+        .bub.agent .markdown ul, .bub.agent .markdown ol { padding-left: 1.25rem; margin: .25em 0; }
+        .bub.agent .markdown li { margin: .1em 0; }
+        .bub.agent .markdown code { background: #1e293b; color: #e2e8f0; padding: .125rem .375rem; border-radius: .25rem; font-size: .8125rem; }
+        .dark .bub.agent .markdown code { background: #0f172a; color: #cbd5e1; }
+        .bub.agent .markdown pre { background: #1e293b; border-radius: .375rem; padding: .625rem .75rem; overflow-x: auto; margin: .375rem 0; }
+        .dark .bub.agent .markdown pre { background: #0f172a; }
+        .bub.agent .markdown pre code { background: none; padding: 0; border-radius: 0; }
+        .bub.agent .markdown strong { font-weight: 600; }
+        .bub.agent .markdown table { border-collapse: collapse; width: 100%; margin: .375rem 0; font-size: .8125rem; }
+        .bub.agent .markdown th, .bub.agent .markdown td { border: 1px solid var(--border); padding: .375rem .5rem; text-align: left; }
+        .bub.agent .markdown th { background: #1e293b10; font-weight: 600; }
+        .bub.agent .markdown blockquote { border-left: 3px solid #2563eb; padding-left: .625rem; margin: .375rem 0; color: #64748b; }
+        @keyframes blink { 0%,100%{opacity:.4} 50%{opacity:1} }
+        .typing span { display: inline-block; width: 6px; height: 6px; background: #94a3b8; border-radius: 50%; animation: blink 1.4s infinite both; }
+        .typing span:nth-child(1) { animation-delay: -.32s }
+        .typing span:nth-child(2) { animation-delay: -.16s }
+        #chatInput { resize: none; scrollbar-width: thin; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 md:px-6 h-14 shrink-0 border-b border-[var(--border)] gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+            <a href="/" class="text-slate-400 hover:text-blue-500 transition-colors shrink-0"><i data-lucide="arrow-left" class="w-5 h-5"></i></a>
+            <div class="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0"><i data-lucide="bot" class="w-4.5 h-4.5 text-blue-500"></i></div>
+            <div class="min-w-0">
+                <h1 class="text-sm font-bold tracking-tight truncate">AI <span class="text-blue-500">Assistant</span></h1>
+                <select id="modelSelect" class="text-[10px] text-slate-400 bg-transparent border-0 p-0 m-0 outline-none cursor-pointer hover:text-blue-500 transition-colors truncate max-w-[180px] appearance-none" style="background: none;">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+            <button onclick="clearChat()" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-slate-500/10 transition-colors" title="Clear chat"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            <button id="theme-toggle" class="text-slate-400 hover:text-blue-500 p-1.5 rounded-lg hover:bg-slate-500/10 transition-colors"><i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i></button>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="chatMessages" class="flex-1 overflow-y-auto px-4 md:px-6 py-3 space-y-3">
+        <div class="flex justify-start">
+            <div class="bub agent p-3.5 flex items-start gap-2.5">
+                <div class="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5"><i data-lucide="bot" class="w-3.5 h-3.5 text-blue-500"></i></div>
+                <div class="min-w-0">
+                    <p class="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-0.5">Assistant</p>
+                    <div class="markdown text-sm">Hello! I'm your MTracker financial assistant. Ask me anything about finance, budgeting, or expense tracking!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Typing -->
+    <div id="typingIndicator" class="hidden px-4 md:px-6 pb-1">
+        <div class="flex justify-start">
+            <div class="bub agent p-3">
+                <div class="typing flex items-center gap-1"><span></span><span></span><span></span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input -->
+    <div class="px-4 md:px-6 pb-3 pt-1">
+        <div class="card p-2.5">
+            <form id="chatForm" class="flex items-end gap-2">
+                <div class="flex-1 relative">
+                    <textarea id="chatInput" rows="1" placeholder="Ask me anything..." class="inp w-full pr-8 resize-none text-sm leading-relaxed py-2 min-h-[36px] max-h-[100px]"></textarea>
+                    <button type="button" onclick="document.getElementById('chatInput').value=''" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hidden" id="clearInputBtn"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                </div>
+                <button type="submit" id="sendBtn" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white p-2.5 rounded-lg transition-all active:translate-y-0.5 shrink-0" disabled><i data-lucide="send" class="w-4 h-4"></i></button>
+            </form>
+            <p class="text-[9px] text-slate-400 mt-1.5 text-center">AI-generated responses · Verify important decisions independently</p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const chatMessages = document.getElementById('chatMessages');
+        const chatForm = document.getElementById('chatForm');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const clearInputBtn = document.getElementById('clearInputBtn');
+        const modelSelect = document.getElementById('modelSelect');
+
+        let currentModel = localStorage.getItem('chat_model') || null;
+
+        // Load models
+        (async function loadModels() {
+            try {
+                const res = await fetch('/api/models');
+                const data = await res.json();
+                modelSelect.innerHTML = '';
+                const saved = localStorage.getItem('chat_model');
+                data.models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = m.label;
+                    if (m.id === saved || (!saved && m.id === data.default)) opt.selected = true;
+                    modelSelect.appendChild(opt);
+                });
+                if (!saved) currentModel = data.default;
+                else currentModel = saved;
+            } catch { modelSelect.innerHTML = '<option>NVIDIA</option>'; }
+        })();
+
+        modelSelect.addEventListener('change', function() {
+            const prev = currentModel;
+            currentModel = this.value;
+            localStorage.setItem('chat_model', currentModel);
+            if (prev && prev !== currentModel) {
+                chatMessages.innerHTML = '';
+                const w = document.createElement('div');
+                w.className = 'flex justify-start';
+                w.innerHTML = '<div class="bub agent p-3.5 flex items-start gap-2.5">' +
+                    '<div class="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5"><i data-lucide="bot" class="w-3.5 h-3.5 text-blue-500"></i></div>' +
+                    '<div class="min-w-0"><p class="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-0.5">Assistant</p>' +
+                    '<div class="markdown text-sm">Switched to **' + modelSelect.options[modelSelect.selectedIndex].text + '**. How can I help you?</div></div></div>';
+                chatMessages.appendChild(w);
+                lucide.createIcons();
+            }
+        });
+
+        function scrollBottom() { chatMessages.scrollTop = chatMessages.scrollHeight; }
+        function toggleSend() {
+            const has = chatInput.value.trim().length > 0;
+            sendBtn.disabled = !has;
+            clearInputBtn.classList.toggle('hidden', !has);
+        }
+        chatInput.addEventListener('input', toggleSend);
+        chatInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatForm.dispatchEvent(new Event('submit')); }
+        });
+
+        chatForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const msg = chatInput.value.trim();
+            if (!msg || sendBtn.disabled) return;
+            chatInput.value = ''; toggleSend(); scrollBottom();
+            appendMsg(msg, 'user'); scrollBottom();
+            showTyping(); scrollBottom();
+            try {
+                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg, model: currentModel }) });
+                const data = await res.json();
+                hideTyping();
+                appendMsg(data.error ? 'Error: ' + data.error : data.reply, 'agent');
+            } catch { hideTyping(); appendMsg('Error: Could not reach the assistant.', 'agent'); }
+            scrollBottom();
+        });
+
+        function appendMsg(text, role) {
+            const div = document.createElement('div');
+            div.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+            const inner = document.createElement('div');
+            inner.className = 'bub ' + role + (role === 'user' ? ' p-3' : ' p-3.5 flex items-start gap-2.5');
+            if (role === 'agent') {
+                inner.innerHTML =
+                    '<div class="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5"><i data-lucide="bot" class="w-3.5 h-3.5 text-blue-500"></i></div>' +
+                    '<div class="min-w-0"><p class="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-0.5">Assistant</p>' +
+                    '<div class="markdown text-sm">' + marked.parse(text) + '</div></div>';
+            } else {
+                inner.textContent = text;
+            }
+            div.appendChild(inner);
+            chatMessages.appendChild(div);
+            lucide.createIcons();
+        }
+
+        function showTyping() { typingIndicator.classList.remove('hidden'); }
+        function hideTyping() { typingIndicator.classList.add('hidden'); }
+
+        function clearChat() {
+            if (!confirm('Clear conversation?')) return;
+            chatMessages.innerHTML = '';
+            const w = document.createElement('div');
+            w.className = 'flex justify-start';
+            w.innerHTML = '<div class="bub agent p-3.5 flex items-start gap-2.5">' +
+                '<div class="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5"><i data-lucide="bot" class="w-3.5 h-3.5 text-blue-500"></i></div>' +
+                '<div class="min-w-0"><p class="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-0.5">Assistant</p>' +
+                '<div class="markdown text-sm">Hello! I\'m your MTracker financial assistant. Ask me anything about finance, budgeting, or expense tracking!</div></div></div>';
+            chatMessages.appendChild(w);
+            lucide.createIcons();
+        }
+
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        function applyIcon() {
+            themeIcon.setAttribute('data-lucide', document.documentElement.classList.contains('dark') ? 'moon' : 'sun');
+            lucide.createIcons();
+        }
+        themeToggle.addEventListener('click', function() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+            applyIcon();
+        });
+        applyIcon();
+        scrollBottom();
+    </script>
+</body>
+</html>

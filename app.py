@@ -8,6 +8,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from database_controller import DatabaseController
+from agent import create_agent, get_response, reset_agent
 import dotenv
 import os
 
@@ -46,7 +47,7 @@ def send_email(subject, recipient, body, html_body=None):
     Uses smtplib directly for reliable dynamic configuration.
     """
     settings = db.get_all_system_settings()
-    
+
     if not settings.get('smtp_server') or not settings.get('sender_email'):
         print("[WARN] Email settings not configured. Falling back to console log.")
         print(f"[MOCK EMAIL] To: {recipient}\nSubject: {subject}\nBody: {body}")
@@ -90,7 +91,7 @@ def send_email(subject, recipient, body, html_body=None):
                 if settings.get('smtp_username'):
                     server.login(settings.get('smtp_username'), settings.get('smtp_password'))
                 server.send_message(msg)
-        
+
         print(f"[DEBUG] Email sent successfully to {recipient}")
         return True
     except Exception as e:
@@ -107,7 +108,7 @@ def get_otp_template(otp, user_name="User", purpose="Verification"):
     card_bg = "#ffffff"
     brand_color = "#2563eb"
     text_color = "#1e293b"
-    
+
     return f"""
     <!DOCTYPE html>
     <html>
@@ -134,7 +135,7 @@ def get_otp_template(otp, user_name="User", purpose="Verification"):
                 </div>
                 <div class="title">Hello {user_name},</div>
                 <div class="message">
-                    We received a request for <b>{purpose}</b> on your MTracker account. 
+                    We received a request for <b>{purpose}</b> on your MTracker account.
                     Please use the following code to complete the process:
                 </div>
                 <div class="otp-container">
@@ -284,7 +285,7 @@ def forgot_password_reset():
     # OTP is valid, reset password
     user_id = stored_otp_data['user_id']
     hashed_password = generate_password_hash(new_password)
-    
+
     if db.update_user_password(user_id, hashed_password):
         del otp_storage[identifier]
         return jsonify({"status": "success", "message": "Password reset successful. You can now login."})
@@ -357,6 +358,37 @@ def logout():
 @login_required
 def index():
     return render_template('index.html', name=current_user.name, user=current_user)
+
+# ── Chat ──────────────────────────────────────────────
+
+@app.route('/chat')
+@login_required
+def chat_page():
+    return render_template('chat.html', name=current_user.name, user=current_user)
+
+@app.route('/api/models')
+@login_required
+def list_models():
+    from agent import NVIDIA_MODELS, NVIDIA_DEFAULT_MODEL
+    items = [{"id": k, "label": v} for k, v in NVIDIA_MODELS.items()]
+    return jsonify({"models": items, "default": NVIDIA_DEFAULT_MODEL})
+
+@app.route('/api/chat', methods=['POST'])
+@login_required
+def chat_api():
+    data = request.get_json(silent=True) or {}
+    message = (data.get('message') or '').strip()
+    model_id = (data.get('model') or '').strip() or None
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+
+    try:
+        reply = get_response(message, model_id=model_id)
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ─────────────────────────────────────────────────────
 
 @app.route('/api/categories', methods=['GET'])
 @login_required
@@ -849,12 +881,12 @@ def admin_delete_user(user_id):
 def get_mail_settings():
     if not current_user.is_admin:
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
-    
+
     settings = db.get_all_system_settings()
     # Mask password for security
     if settings.get('smtp_password'):
         settings['smtp_password'] = '********'
-    
+
     return jsonify(settings)
 
 @app.route('/api/admin/settings/mail', methods=['POST'])
@@ -862,17 +894,17 @@ def get_mail_settings():
 def update_mail_settings():
     if not current_user.is_admin:
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
-    
+
     data = request.json
     keys = ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_use_tls', 'sender_email']
-    
+
     for key in keys:
         if key in data:
             # Don't overwrite password if it's masked or empty
             if key == 'smtp_password' and (data[key] == '********' or not data[key]):
                 continue
             db.update_system_setting(key, str(data[key]))
-            
+
     return jsonify({"status": "success", "message": "Mail settings updated successfully"})
 
 @app.route('/api/admin/settings/mail/test', methods=['POST'])
@@ -880,10 +912,10 @@ def update_mail_settings():
 def test_mail_settings():
     if not current_user.is_admin:
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
-    
+
     test_subject = "MTracker - SMTP Test Connection"
     test_body = f"Hello {current_user.name},\n\nThis is a test email from MTracker to verify your SMTP configuration."
-    
+
     html_body = f"""
     <!DOCTYPE html>
     <html>
@@ -904,14 +936,14 @@ def test_mail_settings():
     </body>
     </html>
     """
-    
+
     success = send_email(
         test_subject,
         current_user.email or "admin@mtracker.com",
         test_body,
         html_body=html_body
     )
-    
+
     if success:
         return jsonify({"status": "success", "message": "Test email sent successfully to your registered email."})
     else:

@@ -142,6 +142,11 @@
                     <span class="font-medium">Dashboard</span>
                 </a>
 
+                <a href="/chat" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="AI Assistant">
+                    <i data-lucide="bot" class="w-4 h-4"></i>
+                    <span class="font-medium">Chat</span>
+                </a>
+
                 <button id="theme-toggle" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="Toggle Theme">
                     <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
                 </button>
@@ -165,6 +170,10 @@
                         <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-500"></i>
                             Dashboard
+                        </a>
+                        <a href="/chat" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
+                            AI Assistant
                         </a>
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -202,6 +211,10 @@
                         <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-500"></i>
                             Dashboard
+                        </a>
+                        <a href="/chat" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
+                            Chat
                         </a>
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -726,5 +739,6 @@
         // Final Init
         checkDirtiness();
     </script>
+{% include 'chat_widget.html' %}
 </body>
 </html>

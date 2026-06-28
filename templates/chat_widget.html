@@ -1,0 +1,322 @@
+<!-- Floating Chat Widget -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+.cw-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+}
+.cw-overlay.open { opacity: 1; pointer-events: auto; }
+
+.cw-btn {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    z-index: 9999;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(37,99,235,.35);
+    transition: all .2s;
+}
+.cw-btn:hover { transform: scale(1.05); background: #1d4ed8; }
+.cw-btn:active { transform: scale(.95); }
+.cw-btn svg { width: 20px; height: 20px; }
+
+.cw-panel {
+    position: fixed;
+    bottom: 5rem;
+    right: 1.25rem;
+    z-index: 9999;
+    width: 380px;
+    max-width: calc(100vw - 2rem);
+    height: 520px;
+    max-height: calc(100vh - 8rem);
+    background: var(--card-bg, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 1rem;
+    box-shadow: 0 16px 48px rgba(0,0,0,.18);
+    display: flex;
+    flex-direction: column;
+    transform: translateY(16px) scale(.96);
+    opacity: 0;
+    pointer-events: none;
+    transition: all .25s cubic-bezier(.4,0,.2,1);
+    overflow: hidden;
+}
+.dark .cw-panel { background: #1e293b; border-color: #334155; }
+.cw-panel.open {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.cw-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .625rem .75rem;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    background: var(--card-bg, #fff);
+    flex-shrink: 0;
+}
+.dark .cw-header { background: #1e293b; border-color: #334155; }
+.cw-header-left { display: flex; align-items: center; gap: .5rem; }
+.cw-header-left .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #2563eb15; display: flex; align-items: center; justify-content: center;
+}
+.cw-header-left .avatar svg { width: 14px; height: 14px; color: #2563eb; }
+.cw-header-left h2 { font-size: .8125rem; font-weight: 700; color: var(--text-color); }
+.dark .cw-header-left h2 { color: #f1f5f9; }
+.cw-header-left p { font-size: .625rem; color: #94a3b8; }
+.cw-header-actions { display: flex; gap: .25rem; }
+.cw-header-actions button {
+    background: none; border: none; cursor: pointer;
+    color: #94a3b8; padding: .25rem; border-radius: .375rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+}
+.cw-header-actions button:hover { background: #00000010; color: #475569; }
+.dark .cw-header-actions button:hover { background: #ffffff10; color: #cbd5e1; }
+.cw-header-actions button svg { width: 16px; height: 16px; }
+
+.cw-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: .625rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    scrollbar-width: thin;
+}
+
+.cw-msg { max-width: 88%; line-height: 1.4; }
+.cw-msg.user {
+    align-self: flex-end;
+    background: #2563eb;
+    color: #fff;
+    padding: .5rem .75rem;
+    border-radius: .75rem .75rem .125rem .75rem;
+    font-size: .8125rem;
+}
+.cw-msg.agent {
+    align-self: flex-start;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    color: var(--text-color);
+    padding: .5rem .75rem;
+    border-radius: .75rem .75rem .75rem .125rem;
+    font-size: .8125rem;
+}
+.dark .cw-msg.agent { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+
+.cw-msg.agent .markdown p { margin: .15em 0; }
+.cw-msg.agent .markdown ul, .cw-msg.agent .markdown ol { padding-left: 1rem; margin: .15em 0; }
+.cw-msg.agent .markdown code { background: #1e293b; color: #e2e8f0; padding: .0625rem .25rem; border-radius: .1875rem; font-size: .75rem; }
+.dark .cw-msg.agent .markdown code { background: #0f172a; color: #cbd5e1; }
+.cw-msg.agent .markdown pre { background: #1e293b; border-radius: .25rem; padding: .375rem .5rem; overflow-x: auto; margin: .25rem 0; }
+.dark .cw-msg.agent .markdown pre { background: #0f172a; }
+.cw-msg.agent .markdown pre code { background: none; padding: 0; }
+.cw-msg.agent .markdown strong { font-weight: 600; }
+
+.cw-footer {
+    padding: .5rem .625rem .625rem;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+    flex-shrink: 0;
+    background: var(--card-bg, #fff);
+}
+.dark .cw-footer { background: #1e293b; border-color: #334155; }
+.cw-footer form { display: flex; gap: .5rem; align-items: flex-end; }
+.cw-footer input {
+    flex: 1;
+    background: var(--input-bg, #fff);
+    border: 1px solid var(--input-border, #cbd5e1);
+    color: var(--input-text, #0f172a);
+    padding: .5rem .625rem;
+    border-radius: .5rem;
+    font-size: .8125rem;
+    outline: none;
+    min-height: 36px;
+}
+.dark .cw-footer input { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+.cw-footer input:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+.cw-footer button[type=submit] {
+    background: #2563eb; color: #fff; border: none;
+    padding: .5rem; border-radius: .5rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s; min-height: 36px; width: 36px;
+}
+.cw-footer button[type=submit]:disabled { opacity: .4; cursor: not-allowed; }
+.cw-footer button[type=submit]:not(:disabled):hover { background: #1d4ed8; }
+.cw-footer button[type=submit] svg { width: 16px; height: 16px; }
+.cw-footer .badge { font-size: 9px; color: #94a3b8; text-align: center; margin-top: .25rem; }
+
+.cw-typing { align-self: flex-start; display: none; }
+.cw-typing.show { display: flex; }
+.cw-typing .b {
+    background: var(--card, #fff); border: 1px solid var(--border, #e2e8f0);
+    padding: .375rem .625rem; border-radius: .75rem;
+}
+.dark .cw-typing .b { background: #1e293b; border-color: #334155; }
+.cw-typing .dots { display: flex; gap: 3px; align-items: center; }
+.cw-typing .dots span {
+    width: 5px; height: 5px; border-radius: 50%; background: #94a3b8;
+    animation: cwblink 1.4s infinite both;
+}
+.cw-typing .dots span:nth-child(1) { animation-delay: -.32s }
+.cw-typing .dots span:nth-child(2) { animation-delay: -.16s }
+@keyframes cwblink { 0%,100%{opacity:.4} 50%{opacity:1} }
+</style>
+
+<button class="cw-btn" id="cwBtn" onclick="cwToggle()" title="AI Assistant">
+    <i data-lucide="bot"></i>
+</button>
+
+<div class="cw-overlay" id="cwOverlay" onclick="cwClose()"></div>
+
+<div class="cw-panel" id="cwPanel">
+    <div class="cw-header">
+        <div class="cw-header-left">
+            <div class="avatar"><i data-lucide="bot"></i></div>
+            <div>
+                <h2>AI Assistant</h2>
+                <select id="cwModelSelect" class="text-[9px] text-slate-400 bg-transparent border-0 p-0 m-0 outline-none cursor-pointer hover:text-blue-500 transition-colors max-w-[160px] truncate appearance-none" style="background: none;">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+        </div>
+        <div class="cw-header-actions">
+            <button onclick="cwClear()" title="Clear"><i data-lucide="trash-2"></i></button>
+            <button onclick="cwClose()" title="Close"><i data-lucide="x"></i></button>
+        </div>
+    </div>
+    <div class="cw-body" id="cwBody">
+        <div class="cw-msg agent">
+            <div class="markdown">Hello! I'm your MTracker assistant. Ask me anything!</div>
+        </div>
+    </div>
+    <div class="cw-typing" id="cwTyping">
+        <div class="b"><div class="dots"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="cw-footer">
+        <form id="cwForm" onsubmit="return cwSend(event)">
+            <input type="text" id="cwInput" placeholder="Ask me anything..." autocomplete="off">
+            <button type="submit" id="cwSendBtn" disabled><i data-lucide="send"></i></button>
+        </form>
+        <div class="badge">AI-generated · Verify independently</div>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+    const cwBody = document.getElementById('cwBody');
+    const cwInput = document.getElementById('cwInput');
+    const cwForm = document.getElementById('cwForm');
+    const cwSendBtn = document.getElementById('cwSendBtn');
+    const cwTyping = document.getElementById('cwTyping');
+    const cwPanel = document.getElementById('cwPanel');
+    const cwOverlay = document.getElementById('cwOverlay');
+    const cwBtn = document.getElementById('cwBtn');
+    const cwModelSelect = document.getElementById('cwModelSelect');
+
+    let cwModel = localStorage.getItem('chat_model') || null;
+
+    // Load models
+    (async function() {
+        try {
+            const res = await fetch('/api/models');
+            const data = await res.json();
+            cwModelSelect.innerHTML = '';
+            const saved = localStorage.getItem('chat_model');
+            data.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.label;
+                if (m.id === saved || (!saved && m.id === data.default)) opt.selected = true;
+                cwModelSelect.appendChild(opt);
+            });
+            if (!saved) cwModel = data.default;
+            else cwModel = saved;
+        } catch { cwModelSelect.innerHTML = '<option>NVIDIA</option>'; }
+    })();
+
+    cwModelSelect.addEventListener('change', function() {
+        cwModel = this.value;
+        localStorage.setItem('chat_model', cwModel);
+    });
+
+    function cwToggle() {
+        cwPanel.classList.toggle('open');
+        cwOverlay.classList.toggle('open');
+        if (cwPanel.classList.contains('open')) setTimeout(() => cwInput.focus(), 250);
+    }
+    function cwClose() { cwPanel.classList.remove('open'); cwOverlay.classList.remove('open'); }
+
+    cwInput.addEventListener('input', function() {
+        cwSendBtn.disabled = this.value.trim().length === 0;
+    });
+    cwInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); cwForm.dispatchEvent(new Event('submit')); }
+    });
+
+    cwForm.addEventListener('submit', cwSend);
+    async function cwSend(e) {
+        e.preventDefault();
+        const msg = cwInput.value.trim();
+        if (!msg) return false;
+        cwInput.value = ''; cwSendBtn.disabled = true;
+
+        const userDiv = document.createElement('div');
+        userDiv.className = 'cw-msg user';
+        userDiv.textContent = msg;
+        cwBody.appendChild(userDiv);
+        cwBody.scrollTop = cwBody.scrollHeight;
+
+        cwTyping.classList.add('show');
+        cwBody.scrollTop = cwBody.scrollHeight;
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, model: cwModel })
+            });
+            const data = await res.json();
+            cwTyping.classList.remove('show');
+
+            const agentDiv = document.createElement('div');
+            agentDiv.className = 'cw-msg agent';
+            agentDiv.innerHTML = '<div class="markdown">' + marked.parse(data.error || data.reply) + '</div>';
+            cwBody.appendChild(agentDiv);
+        } catch {
+            cwTyping.classList.remove('show');
+            const errDiv = document.createElement('div');
+            errDiv.className = 'cw-msg agent';
+            errDiv.textContent = 'Error: Could not reach the assistant.';
+            cwBody.appendChild(errDiv);
+        }
+        cwBody.scrollTop = cwBody.scrollHeight;
+        return false;
+    }
+
+    function cwClear() {
+        if (!confirm('Clear conversation?')) return;
+        cwBody.innerHTML = '<div class="cw-msg agent"><div class="markdown">Hello! I\'m your MTracker assistant. Ask me anything!</div></div>';
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && cwPanel.classList.contains('open')) cwClose();
+    });
+</script>
