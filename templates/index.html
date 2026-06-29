@@ -445,7 +445,13 @@
                 <i data-lucide="chevron-down" class="accordion-chevron w-5 h-5 text-slate-400" id="expenseChart-chevron"></i>
             </div>
             <div class="accordion-content" id="expenseChart-content">
-                <div class="text-purple-500 text-sm uppercase font-bold mb-2 hidden lg:block">Expense Analysis</div>
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-purple-500 text-sm uppercase font-bold hidden lg:block">Expense Analysis</div>
+                    <div class="flex bg-slate-100 dark:bg-slate-700/50 p-0.5 rounded text-xs font-medium border border-slate-200 dark:border-slate-600">
+                        <button onclick="setChartMode('cumulative')" class="px-2 py-0.5 rounded transition-all bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-400" id="chartModeCumulative">Cumulative</button>
+                        <button onclick="setChartMode('breakdown')" class="px-2 py-0.5 rounded transition-all text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" id="chartModeBreakdown">Breakdown</button>
+                    </div>
+                </div>
                 <div class="relative w-full min-h-[200px]">
                     <canvas id="expenseChart"></canvas>
                     <div id="expenseChartNoData" class="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm hidden">
@@ -557,6 +563,20 @@
                         </div>
                     </div>
 
+                    <!-- Filter Bar -->
+                    <div class="grid grid-cols-3 md:grid-cols-6 gap-1.5 mb-2 p-2 bg-slate-100 dark:bg-slate-800/50 rounded">
+                        <select id="paidFilterAccount" class="input-dark text-xs p-1" onchange="renderUI()">
+                            <option value="">Account</option>
+                        </select>
+                        <select id="paidFilterCategory" class="input-dark text-xs p-1" onchange="renderUI()">
+                            <option value="">Category</option>
+                        </select>
+                        <input type="date" id="paidFilterDateFrom" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="From">
+                        <input type="date" id="paidFilterDateTo" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="To">
+                        <input type="number" id="paidFilterAmountMin" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="Min ₹">
+                        <input type="number" id="paidFilterAmountMax" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="Max ₹">
+                    </div>
+
                     <div id="paidTableContainer" class="overflow-x-auto">
                         <div class="w-full">
                             <table class="w-full text-left text-sm border-separate" style="border-spacing:0">
@@ -582,6 +602,29 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Daily Expense Cumulative Summary -->
+                    <div id="dailyExpenseCumulativeSection" class="mt-3 hidden">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i data-lucide="coffee" class="text-blue-500 w-4 h-4"></i>
+                            <h3 class="text-sm font-semibold text-blue-500">Daily Expense Summary</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                                    <tr>
+                                        <th class="p-1.5 w-8">#</th>
+                                        <th class="p-1.5">Category</th>
+                                        <th class="p-1.5 text-right">Count</th>
+                                        <th class="p-1.5 text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dailyExpenseCumulativeList" class="divide-y divide-blue-200 dark:divide-blue-800">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div id="noPaidExpenses" class="hidden text-center text-slate-500 py-8">
                         No expenses made yet.
                     </div>
@@ -634,6 +677,20 @@
                                 <button onclick="addPersonal()" class="btn-add bg-blue-500 hover:bg-blue-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Filter Bar -->
+                    <div class="grid grid-cols-3 md:grid-cols-6 gap-1.5 mb-2 p-2 bg-slate-100 dark:bg-slate-800/50 rounded">
+                        <select id="persFilterAccount" class="input-dark text-xs p-1" onchange="renderUI()">
+                            <option value="">Account</option>
+                        </select>
+                        <select id="persFilterCategory" class="input-dark text-xs p-1" onchange="renderUI()">
+                            <option value="">Category</option>
+                        </select>
+                        <input type="date" id="persFilterDateFrom" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="From">
+                        <input type="date" id="persFilterDateTo" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="To">
+                        <input type="number" id="persFilterAmountMin" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="Min ₹">
+                        <input type="number" id="persFilterAmountMax" class="input-dark text-xs p-1" onchange="renderUI()" placeholder="Max ₹">
                     </div>
 
                     <div id="personalListWrapper" class="w-full">
@@ -1189,6 +1246,7 @@
         let categories = [];
         let expenseChart = null;
         let pdfChart = null;
+        let expenseChartMode = 'cumulative';
         let pendingItemToPay = null;
         let longPendingItemToPay = null;
 
@@ -1333,6 +1391,11 @@
                 $('#newPaidCat').html(options);
                 $('#newPendCat').html(options);
                 $('#newPersCategory').html(options);
+
+                const filterOpts = '<option value="">Category</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+                $('#paidFilterCategory').html(filterOpts);
+                $('#persFilterCategory').html(filterOpts);
+
                 renderCategoriesList();
             }).fail(function(xhr) {
                 if (xhr.status === 401) window.location.href = '/login';
@@ -1762,65 +1825,106 @@
 
             renderCharts(); // Render Charts
 
-            // Render Paid List with serial numbers
+            // --- Filter helper ---
+            function itemMatchesFilters(item, prefix) {
+                const fAccount = $(`#${prefix}FilterAccount`).val();
+                const fCategory = $(`#${prefix}FilterCategory`).val();
+                const fDateFrom = $(`#${prefix}FilterDateFrom`).val();
+                const fDateTo = $(`#${prefix}FilterDateTo`).val();
+                const fAmtMin = parseFloat($(`#${prefix}FilterAmountMin`).val());
+                const fAmtMax = parseFloat($(`#${prefix}FilterAmountMax`).val());
+                if (fAccount && item.account !== fAccount) return false;
+                if (fCategory && item.category !== fCategory) return false;
+                if (fDateFrom && item.date && item.date < fDateFrom) return false;
+                if (fDateTo && item.date && item.date > fDateTo) return false;
+                if (!isNaN(fAmtMin) && parseFloat(item.amount) < fAmtMin) return false;
+                if (!isNaN(fAmtMax) && parseFloat(item.amount) > fAmtMax) return false;
+                return true;
+            }
+
+            // Render Paid List (only paidExpenses, not personal)
             let paidRows = '';
-
-            // Merge Paid and Personal for the Main Report View
-            // Mapping Personal items to match Paid item structure if needed, though they are similar now.
             const paidItems = (currentData.paidExpenses || []).map(i => ({...i, listName: 'paidExpenses', sortDate: i.date}));
-            const personalItems = (currentData.personalExpenses || []).map(i => ({...i, listName: 'personalExpenses', sortDate: i.date || ''}));
-
-            // Combine and Sort by Date Descending
-            const combinedList = [...paidItems, ...personalItems].sort((a, b) => {
+            const filteredPaidItems = paidItems.filter(i => itemMatchesFilters(i, 'paid')).sort((a, b) => {
                 if (!a.sortDate) return 1;
                 if (!b.sortDate) return -1;
                 return new Date(b.sortDate) - new Date(a.sortDate);
             });
 
-            combinedList.forEach(item => {
+            filteredPaidItems.forEach(item => {
                 rowIndex++;
-                // Visual distinction for Daily/Personal items could be subtle or explicit.
-                // We'll trust the category to distinguish them.
-                const categoryLabel = item.category || 'Personal';
-
                 paidRows += `
                 <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/50 group">
                     <td class="p-2 text-xs text-slate-600">${rowIndex}</td>
                     <td class="p-2 font-medium">${item.reason}</td>
                     <td class="p-2 text-sm text-slate-500">${item.account || 'Cash'}</td>
-                    <td class="p-2"><span class="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-sm">${categoryLabel}</span></td>
+                    <td class="p-2"><span class="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-sm">${item.category || 'Uncategorized'}</span></td>
                     <td class="p-2 text-slate-500 dark:text-slate-400 text-sm">${item.date}</td>
                     <td class="p-2 text-right font-mono text-emerald-600 dark:text-emerald-400">₹${item.amount.toLocaleString()}</td>
                     <td class="p-2 text-right">
-                        <button onclick="editItem('${item.listName === 'paidExpenses' ? 'paid' : 'personal'}', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100 mr-2"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                        <button onclick="deleteItem('${item.listName}', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        <button onclick="editItem('paid', '${item.id}')" class="text-blue-500 opacity-0 group-hover:opacity-100 mr-2"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                        <button onclick="deleteItem('paidExpenses', '${item.id}')" class="text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
                 </tr>`;
             });
 
-            if (rowIndex === 0) {
+            // --- Daily Expense Cumulative Summary ---
+            const personalItems = (currentData.personalExpenses || []);
+            const filteredPersonalItems = personalItems.filter(i => itemMatchesFilters(i, 'pers'));
+            const catGroups = {};
+            filteredPersonalItems.forEach(item => {
+                const cat = item.category || 'Personal';
+                if (!catGroups[cat]) catGroups[cat] = { count: 0, total: 0 };
+                catGroups[cat].count++;
+                catGroups[cat].total += parseFloat(item.amount);
+            });
+            const catKeys = Object.keys(catGroups);
+            if (catKeys.length > 0) {
+                let cumulIdx = 0;
+                let cumulHtml = '';
+                for (const cat of catKeys) {
+                    cumulIdx++;
+                    cumulHtml += `
+                    <tr class="border-b border-blue-200 dark:border-blue-800">
+                        <td class="p-1.5 text-xs text-slate-600">${cumulIdx}</td>
+                        <td class="p-1.5"><span class="bg-blue-100 dark:bg-blue-800/50 px-2 py-0.5 rounded text-sm">${cat}</span></td>
+                        <td class="p-1.5 text-right text-sm text-slate-500">${catGroups[cat].count}</td>
+                        <td class="p-1.5 text-right font-mono text-blue-600 dark:text-blue-400">₹${catGroups[cat].total.toLocaleString()}</td>
+                    </tr>`;
+                }
+                $('#dailyExpenseCumulativeSection').removeClass('hidden');
+                $('#dailyExpenseCumulativeList').html(cumulHtml);
+            } else {
+                $('#dailyExpenseCumulativeSection').addClass('hidden');
+            }
+
+            const hasAnyPaidData = rowIndex > 0 || catKeys.length > 0;
+            if (!hasAnyPaidData) {
                 $('#paidTableContainer').addClass('hidden');
                 $('#noPaidExpenses').removeClass('hidden');
             } else {
                 $('#paidTableContainer').removeClass('hidden');
                 $('#noPaidExpenses').addClass('hidden');
                 $('#paidList').html(paidRows);
-
-                // Responsive max-height adjustments for paid list scroll area
                 const paidScroll = $('#paidTableScroll');
-                if (window.innerWidth < 640) { // Mobile: small height
+                if (window.innerWidth < 640) {
                     paidScroll.css('max-height', '220px');
-                } else if (window.innerWidth < 1024) { // Tablet
+                } else if (window.innerWidth < 1024) {
                     paidScroll.css('max-height', '320px');
-                } else { // Desktop
+                } else {
                     paidScroll.css('max-height', '420px');
                 }
             }
 
-            // Render Personal List with serial numbers
-            const persArr = (currentData.personalExpenses || []).slice().reverse();
+            // Update totals with filtered values
+            const filteredTotalPaid = filteredPaidItems.reduce((sum, i) => sum + parseFloat(i.amount), 0);
+            const filteredTotalPersonal = filteredPersonalItems.reduce((sum, i) => sum + parseFloat(i.amount), 0);
+            $('#totalPaidDisplay').text('₹' + (filteredTotalPaid + filteredTotalPersonal).toLocaleString());
+
+            // Render Personal List with serial numbers (filtered)
+            const persSorted = filteredPersonalItems.slice().reverse();
             let persHtml = '';
-            persArr.forEach((item, idx) => {
+            persSorted.forEach((item, idx) => {
                 const sn = idx + 1;
                 persHtml += `
                 <div class="flex justify-between items-center text-base p-2 bg-blue-50 dark:bg-blue-900/20 rounded group">
@@ -1844,6 +1948,7 @@
                 `;
             });
             $('#personalList').html(persHtml);
+            $('#totalPersonalDisplay').text('₹' + filteredTotalPersonal.toLocaleString());
 
             // Render Pending List with serial numbers
             const pendArr = (currentData.pendingExpenses || []).slice().reverse();
@@ -1895,10 +2000,17 @@
                 categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(item.amount);
             });
 
-            // Personal Expenses (Group as 'Personal')
-            const personalTotal = (currentData.personalExpenses || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
-            if (personalTotal > 0) {
-                categoryTotals['Personal'] = (categoryTotals['Personal'] || 0) + personalTotal;
+            // Personal Expenses (Cumulative or Breakdown by category)
+            if (expenseChartMode === 'cumulative') {
+                const personalTotal = (currentData.personalExpenses || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
+                if (personalTotal > 0) {
+                    categoryTotals['Personal'] = (categoryTotals['Personal'] || 0) + personalTotal;
+                }
+            } else {
+                (currentData.personalExpenses || []).forEach(item => {
+                    const cat = item.category || 'Personal';
+                    categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(item.amount);
+                });
             }
 
             const labels = Object.keys(categoryTotals);
@@ -1976,6 +2088,13 @@
                     layout: { padding: 2 }
                 }
             });
+        }
+
+        function setChartMode(mode) {
+            expenseChartMode = mode;
+            $('#chartModeCumulative').toggleClass('bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-400', mode === 'cumulative').toggleClass('text-slate-500 hover:text-slate-700 dark:hover:text-slate-300', mode !== 'cumulative');
+            $('#chartModeBreakdown').toggleClass('bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-400', mode === 'breakdown').toggleClass('text-slate-500 hover:text-slate-700 dark:hover:text-slate-300', mode !== 'breakdown');
+            renderCharts();
         }
 
         // --- Actions ---
@@ -2653,6 +2772,10 @@
             $('#newIncomeAccount').html(options);
             $('#newPersAccount').html(options);
             $('#payLongPendingAccount').html(options);
+
+            const filterOpts = '<option value="">Account</option>' + accounts.map(a => `<option value="${a.account_name}">${a.account_name}</option>`).join('');
+            $('#paidFilterAccount').html(filterOpts);
+            $('#persFilterAccount').html(filterOpts);
 
             // Pre-select default account if available
             if (DEFAULT_ACCOUNT_ID) {
