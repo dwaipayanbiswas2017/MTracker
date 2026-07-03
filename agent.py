@@ -95,7 +95,6 @@ DEFAULT_MODELS = {
 
 NVIDIA_MODELS = {
     "google/diffusiongemma-26b-a4b-it": "DiffusionGemma 26B",
-    "minimaxai/minimax-m3":             "MiniMax-M3 (428B MoE)",
     "qwen/qwen3.5-122b-a10b":           "Qwen 3.5 122B (10B active)",
 }
 
