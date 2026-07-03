@@ -397,7 +397,7 @@ def chat_api():
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        reply = get_response(message, model_id=model_id)
+        reply = get_response(message, user_id=current_user.id, db=db, model_id=model_id)
         return jsonify({"reply": reply})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

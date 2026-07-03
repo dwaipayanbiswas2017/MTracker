@@ -786,16 +786,16 @@ class DatabaseController:
         Creates a new Personal Access Token for a user.
         Returns the token_id and the raw token value (to show once).
         """
-        import hashlib, secrets
+        import hashlib, secrets, time
         conn = self.get_connection()
         if not conn: return None
         try:
             token_value = 'mt_live_' + secrets.token_hex(32)
             token_hash = hashlib.sha256(token_value.encode()).hexdigest()
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT IFNULL(MAX(id), 0) + 1 as next_id FROM personal_access_tokens WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT COUNT(*) as cnt FROM personal_access_tokens WHERE user_id = %s", (user_id,))
             row = cursor.fetchone()
-            token_id = f"{user_id}_{row['next_id']}"
+            token_id = f"{user_id}_pat{row['cnt'] + 1}"
             cursor.execute("""
                 INSERT INTO personal_access_tokens (id, user_id, token_hash, name, scope)
                 VALUES (%s, %s, %s, %s, %s)
