@@ -4,16 +4,19 @@ MTracker is a professional personal finance management application designed to h
 
 ## Features
 
--   **Multi-Account Support**: Track expenses and income for different accounts (e.g., Cash, Bank, Credit Card).
+-   **Multi-Account Support**: Track expenses and income for different accounts (e.g., Cash, Bank, Credit Card) with an All/Default view toggle.
 -   **Monthly Tracking**: Create and manage monthly budgets and transactions.
 -   **Expense Categorization**: Categorize your expenses (e.g., Food, Bills, EMI) with full CRUD support.
+-   **Fund Transfer**: Move money between accounts in a single operation — creates a debit (paid expense) in the source and a credit (income) in the destination. Deleting either side auto-removes the linked entry.
+-   **Expense Analysis Chart**: Doughnut chart aggregating expenses by category, filterable to the default account for focused analysis.
+-   **Personal Budget Tracking**: Mark any pending budget as "personal" to auto-reduce it against daily expenses, showing remaining vs. original amounts.
 -   **Long Pending Payments**: Track and manage long-term debts with partial payment support linked to monthly cycles.
 -   **Password Recovery**: Secure password reset flow using OTP verification via email for lost credentials.
 -   **CSV Import**: Batch import transaction data from CSV files for rapid entry.
 -   **PDF Export**: Generate professional monthly statements in PDF format with automatic charts.
 -   **Profile Management**: Update profile pictures, manage contact info with OTP verification, and set currency/account preferences.
 -   **Admin Panel & System Settings**: Global oversight with user management and system-wide configuration (e.g., SMTP settings) via a dedicated dashboard.
--   **Modern Dynamic UI**: Clean, tactile interface with a consistent theme engine supporting Light and Dark modes.
+-   **Modern Dynamic UI**: Clean, tactile interface with a consistent theme engine supporting Light and Dark modes. Password visibility toggle on login/register.
 -   **Secure Authentication**: Role-based access control with secure password hashing and dual-identifier (Email/Phone) login.
 
 ## API Endpoints
@@ -140,9 +143,9 @@ To ensure MTracker starts automatically on boot, a `systemd` service is provided
 
 1.  **Register/Login**: Start by creating an account. The first registered user can be manually promoted to admin via the database if needed.
 2.  **Initialize Months**: Create a "New Month" to start tracking. Balances are automatically calculated and carried forward.
-3.  **Configure Accounts**: Add your bank accounts or physical wallets in the "Accounts" section.
-4.  **Manage Transactions**: Use the dashboard to record income, expenses, and track pending items.
-5.  **Analyze & Export**: Use the built-in charts for visual analysis or export a professional PDF report for your records.
+3.  **Configure Accounts**: Add your bank accounts or physical wallets in the "Accounts" section. Set a default account in Profile for chart filtering and auto-selection.
+4.  **Manage Transactions**: Use the dashboard to record income, expenses, track pending items, and transfer funds between accounts via the Transfer button in the balance card.
+5.  **Analyze & Export**: Use the built-in Expense Analysis chart (toggle All/Default view) for visual analysis or export a professional PDF report for your records.
 
 ## License
 
