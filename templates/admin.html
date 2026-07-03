@@ -137,9 +137,9 @@
                         {% if current_user.profile_pic_path %}
                             <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
                                  class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500"
-                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}'">
                         {% else %}
-                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
                                  class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500">
                         {% endif %}
                         <span class="font-medium mr-1">{{ current_user.name.split(' ')[0] if current_user.name else 'User' }}</span>
@@ -174,9 +174,9 @@
                         {% if current_user.profile_pic_path %}
                             <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
                                  class="w-8 h-8 rounded-full object-cover"
-                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}'">
                         {% else %}
-                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
                                  class="w-8 h-8 rounded-full object-cover">
                         {% endif %}
                     </button>
@@ -373,13 +373,13 @@
                                 </td>
                                 <td>
                                     <div class="flex gap-2">
-                                        <button onclick="toggleAdmin('{{ user.id }}', '{{ user.name }}', {{ 'true' if user.is_admin else 'false' }})" class="btn-action {% if user.is_admin %}text-blue-500 bg-blue-500/10 hover:bg-blue-500/20{% else %}text-slate-500 bg-slate-500/10 hover:bg-slate-500/20{% endif %}" title="{% if user.is_admin %}Demote from Admin{% else %}Promote to Admin{% endif %}">
+                                        <button onclick="toggleAdmin('{{ user.id }}', {{ user.name | tojson }}, {{ 'true' if user.is_admin else 'false' }})" class="btn-action {% if user.is_admin %}text-blue-500 bg-blue-500/10 hover:bg-blue-500/20{% else %}text-slate-500 bg-slate-500/10 hover:bg-slate-500/20{% endif %}" title="{% if user.is_admin %}Demote from Admin{% else %}Promote to Admin{% endif %}">
                                             <i data-lucide="shield{% if user.is_admin %}-off{% endif %}" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="toggleUser('{{ user.id }}', '{{ user.name }}')" class="btn-action {% if user.is_active %}text-orange-500 bg-orange-500/10 hover:bg-orange-500/20{% else %}text-green-500 bg-green-500/10 hover:bg-green-500/20{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Reactivate{% endif %}">
+                                        <button onclick="toggleUser('{{ user.id }}', {{ user.name | tojson }})" class="btn-action {% if user.is_active %}text-orange-500 bg-orange-500/10 hover:bg-orange-500/20{% else %}text-green-500 bg-green-500/10 hover:bg-green-500/20{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Reactivate{% endif %}">
                                             <i data-lucide="{% if user.is_active %}user-minus{% else %}user-plus{% endif %}" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="deleteUser('{{ user.id }}', '{{ user.name }}')" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete Permanently">
+                                        <button onclick="deleteUser('{{ user.id }}', {{ user.name | tojson }})" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete Permanently">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
                                     </div>

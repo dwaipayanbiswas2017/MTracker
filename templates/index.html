@@ -43,6 +43,21 @@
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- DOMPurify for XSS prevention -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.0/purify.min.js"></script>
+    <script>
+        function sani(v) { return v && typeof v === 'string' ? DOMPurify.sanitize(v) : v; }
+        function sanitizeData(obj) {
+            if (Array.isArray(obj)) { obj.forEach(sanitizeData); return; }
+            if (obj && typeof obj === 'object') {
+                Object.keys(obj).forEach(k => {
+                    if (typeof obj[k] === 'string') obj[k] = DOMPurify.sanitize(obj[k]);
+                    else if (Array.isArray(obj[k]) || (obj[k] && typeof obj[k] === 'object')) sanitizeData(obj[k]);
+                });
+            }
+        }
+    </script>
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -324,9 +339,9 @@
                         {% if current_user.profile_pic_path %}
                             <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
                                  class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500"
-                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=' + encodeURIComponent(currentUserName)">
                         {% else %}
-                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
                                  class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500">
                         {% endif %}
                         <span class="font-medium mr-1">{{ current_user.name.split(' ')[0] if current_user.name else 'User' }}</span>
@@ -367,9 +382,9 @@
                         {% if current_user.profile_pic_path %}
                             <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
                                  class="w-8 h-8 rounded-full object-cover"
-                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=' + encodeURIComponent(currentUserName)">
                         {% else %}
-                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
                                  class="w-8 h-8 rounded-full object-cover">
                         {% endif %}
                     </button>
@@ -1288,7 +1303,8 @@
 
     <!-- Scripts -->
     <script>
-        const DEFAULT_ACCOUNT_ID = "{{ user.default_account_id or '' }}";
+        const DEFAULT_ACCOUNT_ID = {{ user.default_account_id | tojson }};
+        const currentUserName = {{ current_user.name | tojson }};
         let currentData = {};
         let currentViewMode = 'all';
         let currentMonthId = '';
@@ -1431,6 +1447,7 @@
 
         function loadCategories() {
             $.get('/api/categories', function(cats) {
+                sanitizeData(cats);
                 categories = cats;
                 let options = '';
                 if (cats.length === 0) {
@@ -1696,6 +1713,7 @@
             currentMonthId = id;
             $.get(`/api/month/${id}`, function(data) {
                 currentData = data;
+                sanitizeData(currentData);
                 renderUI();
             }).fail(function(xhr) {
                 if (xhr.status === 401) window.location.href = '/login';
@@ -2922,6 +2940,7 @@
                         accs.unshift(defaultAcc);
                     }
                 }
+                sanitizeData(accs);
                 accounts = accs;
                 updateAccountDropdowns();
                 renderAccountsList();

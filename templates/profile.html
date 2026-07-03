@@ -163,9 +163,9 @@
                         {% if current_user.profile_pic_path %}
                             <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
                                  class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500"
-                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}'">
                         {% else %}
-                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
                                  class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500">
                         {% endif %}
                         <span class="font-medium mr-1">{{ current_user.name.split(' ')[0] if current_user.name else 'User' }}</span>
@@ -206,9 +206,9 @@
                         {% if current_user.profile_pic_path %}
                             <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
                                  class="w-8 h-8 rounded-full object-cover"
-                                 onerror="this.src='https://ui-avatars.com/api/?name={{ current_user.name }}'">
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}'">
                         {% else %}
-                            <img src="https://ui-avatars.com/api/?name={{ current_user.name }}"
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
                                  class="w-8 h-8 rounded-full object-cover">
                         {% endif %}
                     </button>
@@ -264,9 +264,9 @@
                         {% if user.profile_pic_path %}
                             <img id="preview" src="{{ url_for('static', filename=user.profile_pic_path.replace('static/', '')) }}"
                                  class="w-32 h-32 rounded-full object-cover border-4 border-blue-600 shadow-xl"
-                                 onerror="this.src='https://ui-avatars.com/api/?name={{ user.name }}&background=random'">
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ user.name | urlencode }}&background=random'">
                         {% else %}
-                            <img id="preview" src="https://ui-avatars.com/api/?name={{ user.name }}&background=random"
+                            <img id="preview" src="https://ui-avatars.com/api/?name={{ user.name | urlencode }}&background=random"
                                  class="w-32 h-32 rounded-full object-cover border-4 border-blue-600 shadow-xl">
                         {% endif %}
                         <label for="profile_pic" class="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors border-2 border-white dark:border-slate-800">
