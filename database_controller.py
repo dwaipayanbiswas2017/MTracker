@@ -323,7 +323,7 @@ class DatabaseController:
 
             # 3. Get Income
             query_inc = """
-                SELECT i.id, i.source, i.amount, a.account_name as account
+                SELECT i.id, i.source, i.amount, i.notes, a.account_name as account
                 FROM income i
                 JOIN accounts a ON i.account_id = a.id
                 WHERE i.month_id = %s
@@ -334,7 +334,7 @@ class DatabaseController:
 
             # 4. Get Paid Expenses (Excluding daily logs to prevent duplication in frontend arrays)
             query_pe = """
-                SELECT pe.id, pe.reason, pe.amount, pe.expense_date as date,
+                SELECT pe.id, pe.reason, pe.amount, pe.expense_date as date, pe.notes,
                        c.category_name as category, a.account_name as account,
                        pe.is_long_pending, pe.linked_long_pending_id as linkedId
                 FROM paid_expenses pe
@@ -426,8 +426,9 @@ class DatabaseController:
             for item in data.get('income', []):
                 acc_id = account_map.get(item.get('account'), account_map.get('Cash'))
                 if acc_id:
-                    cursor.execute("INSERT INTO income (id, user_id, month_id, account_id, source, amount) VALUES (%s, %s, %s, %s, %s, %s)",
-                                 (str(item['id']), user_id, month_id, acc_id, item['source'], item['amount']))
+                    notes = item.get('notes')
+                    cursor.execute("INSERT INTO income (id, user_id, month_id, account_id, source, amount, notes) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                                 (str(item['id']), user_id, month_id, acc_id, item['source'], item['amount'], notes))
 
             # 3. Update Paid Expenses
             # Note: We avoid deleting records that are linked to Long Pending to maintain history integrity
@@ -441,11 +442,12 @@ class DatabaseController:
                 acc_id = account_map.get(item.get('account'), account_map.get('Cash'))
                 cat_id = category_map.get(item.get('category'))
                 if acc_id and cat_id:
+                    notes = item.get('notes')
                     cursor.execute("""
-                        INSERT INTO paid_expenses (id, user_id, month_id, account_id, category_id, reason, amount, expense_date, is_daily_log)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE)
-                        ON DUPLICATE KEY UPDATE reason=VALUES(reason), amount=VALUES(amount), category_id=VALUES(category_id)
-                    """, (str(item['id']), user_id, month_id, acc_id, cat_id, item['reason'], item['amount'], item['date']))
+                        INSERT INTO paid_expenses (id, user_id, month_id, account_id, category_id, reason, amount, expense_date, is_daily_log, notes)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s)
+                        ON DUPLICATE KEY UPDATE reason=VALUES(reason), amount=VALUES(amount), category_id=VALUES(category_id), notes=VALUES(notes)
+                    """, (str(item['id']), user_id, month_id, acc_id, cat_id, item['reason'], item['amount'], item['date'], notes))
 
             # 4. Update Personal Expenses (Insert as daily_log entries in paid_expenses)
             # No separate delete needed as step 3 deleted all non-long-pending for the month
@@ -617,6 +619,12 @@ class DatabaseController:
                     SET paid_amount = paid_amount - %s, status = 'active'
                     WHERE id = %s
                 """, (expense['amount'], expense['linked_long_pending_id']))
+
+            # If this expense was created via a fund transfer, also delete linked income entry
+            if expense['notes'] and expense['notes'].startswith('__transfer__:'):
+                transfer_id = expense['notes'].split(':')[1]
+                cursor.execute("DELETE FROM income WHERE month_id = %s AND notes = %s",
+                               (expense['month_id'], f'__transfer__:{transfer_id}'))
 
             # Delete from paid_expenses (history entries in long_pending_payments will cascade or stay depending on DB choice)
             cursor.execute("DELETE FROM paid_expenses WHERE id = %s", (expense_id,))

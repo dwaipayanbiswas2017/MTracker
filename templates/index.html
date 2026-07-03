@@ -1023,6 +1023,51 @@
         </div>
     </div>
 
+    <!-- Fund Transfer Modal -->
+    <div id="transferModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
+        <div class="card w-96 max-w-full m-4 p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Fund Transfer</h3>
+                <button onclick="closeTransferModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1 font-medium">From Account</label>
+                    <select id="transferFromAccount" class="input-dark w-full">
+                        <option value="">Select source account...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1 font-medium">To Account</label>
+                    <select id="transferToAccount" class="input-dark w-full">
+                        <option value="">Select destination account...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1 font-medium">Amount</label>
+                    <input type="number" id="transferAmount" placeholder="₹" class="input-dark w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1 font-medium">Category</label>
+                    <select id="transferCategory" class="input-dark w-full">
+                        <option value="">Select category...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1 font-medium">Date</label>
+                    <input type="date" id="transferDate" class="input-dark w-full">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-500 dark:text-slate-400 mb-1 font-medium">Description (optional)</label>
+                    <input type="text" id="transferDescription" placeholder="e.g. Savings transfer" class="input-dark w-full">
+                </div>
+                <button onclick="transferFunds()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg w-full font-bold shadow-md active:translate-y-0.5 transition-all mt-4 flex items-center justify-center gap-2">
+                    <i data-lucide="arrow-right-left" class="w-5 h-5"></i> Transfer Funds
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="createModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50">
         <div class="card w-96 max-w-full m-4 p-6 shadow-2xl">
             <h2 class="text-xl font-bold mb-4 text-slate-900 dark:text-white">Start New Month</h2>
@@ -1495,6 +1540,75 @@
             $('#messageModal').addClass('hidden').removeClass('flex');
         }
 
+        function openTransferModal() {
+            $('#transferDate').val(new Date().toISOString().split('T')[0]);
+            // Populate account dropdowns
+            const accOpts = accounts.map(a => `<option value="${a.account_name}">${a.account_name}</option>`).join('');
+            $('#transferFromAccount').html('<option value="">Select source account...</option>' + accOpts);
+            $('#transferToAccount').html('<option value="">Select destination account...</option>' + accOpts);
+            // Populate category dropdown
+            const catOpts = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            $('#transferCategory').html('<option value="">Select category...</option>' + catOpts);
+            $('#transferAmount').val('');
+            $('#transferDescription').val('');
+            $('#transferModal').removeClass('hidden').addClass('flex');
+            lucide.createIcons();
+        }
+
+        function closeTransferModal() {
+            $('#transferModal').addClass('hidden').removeClass('flex');
+        }
+
+        function transferFunds() {
+            const fromAccount = $('#transferFromAccount').val();
+            const toAccount = $('#transferToAccount').val();
+            const amount = parseFloat($('#transferAmount').val());
+            const category = $('#transferCategory').val();
+            const date = $('#transferDate').val() || new Date().toISOString().split('T')[0];
+            const description = $('#transferDescription').val() || `Transfer to ${toAccount}`;
+
+            if (!fromAccount || !toAccount || !amount || !category) {
+                showMessageModal('Please fill in all required fields (From, To, Amount, Category).');
+                return;
+            }
+            if (fromAccount === toAccount) {
+                showMessageModal('Source and destination accounts must be different.');
+                return;
+            }
+            if (amount <= 0) {
+                showMessageModal('Amount must be greater than 0.');
+                return;
+            }
+
+            if (!Array.isArray(currentData.paidExpenses)) currentData.paidExpenses = [];
+            if (!Array.isArray(currentData.income)) currentData.income = [];
+
+            const transferRef = String(Date.now());
+
+            // Create a paid expense from the source account
+            currentData.paidExpenses.push({
+                id: transferRef,
+                reason: description,
+                category: category,
+                amount: amount,
+                date: date,
+                account: fromAccount,
+                notes: `__transfer__:${transferRef}`
+            });
+
+            // Create an income entry to the destination account
+            currentData.income.push({
+                id: String(Date.now() + 1),
+                source: `Transfer from ${fromAccount}`,
+                amount: amount,
+                account: toAccount,
+                notes: `__transfer__:${transferRef}`
+            });
+
+            closeTransferModal();
+            saveData();
+        }
+
         function confirmRename() {
             const type = $('#renameType').val();
             const oldName = $('#renameOldValue').val();
@@ -1658,7 +1772,19 @@
             const totalPersonal = (currentData.personalExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
             const totalPaidList = (currentData.paidExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
             const totalPaid = totalPaidList + totalPersonal;
-            const totalPending = (currentData.pendingExpenses || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+
+            // Link Personal Expenses pending budget with daily expenses
+            const effectivePendingExpenses = (currentData.pendingExpenses || []).map(item => {
+                const baseAmt = parseFloat(item.amount) || 0;
+                const isPersonalBudget = (item.category && item.category.toLowerCase().includes('personal'))
+                    || (item.reason && item.reason.toLowerCase().includes('personal'));
+                if (isPersonalBudget) {
+                    const remaining = Math.max(0, baseAmt - totalPersonal);
+                    return { ...item, _originalAmount: baseAmt, amount: remaining };
+                }
+                return { ...item, _originalAmount: baseAmt, amount: baseAmt };
+            });
+            const totalPending = effectivePendingExpenses.reduce((sum, item) => sum + (item.amount || 0), 0);
 
             const totalAvailable = totalOpening + totalIncome;
             const currentBalance = totalAvailable - totalPaid;
@@ -1772,7 +1898,10 @@
                 <!-- Balance Card -->
                 <div class="card border-l-4 border-l-blue-500 p-4 flex flex-col justify-between gap-4">
 
-                    <div class="flex justify-end">
+                    <div class="flex justify-end gap-2">
+                        <button onclick="openTransferModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1 transition-all">
+                            <i data-lucide="arrow-right-left" class="w-3 h-3"></i> Transfer
+                        </button>
                         <div class="bg-slate-100 dark:bg-slate-700/50 p-0.5 rounded flex text-xs font-medium border border-slate-200 dark:border-slate-600">
                              <button onclick="setViewMode('all')" class="${currentViewMode === 'all' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'} px-2 py-0.5 rounded transition-all">All</button>
                              <button onclick="setViewMode('default')" class="${currentViewMode === 'default' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'} px-2 py-0.5 rounded transition-all">Default</button>
@@ -1951,10 +2080,15 @@
             $('#totalPersonalDisplay').text('₹' + filteredTotalPersonal.toLocaleString());
 
             // Render Pending List with serial numbers
-            const pendArr = (currentData.pendingExpenses || []).slice().reverse();
+            const pendArr = effectivePendingExpenses.slice().reverse();
             let pendHtml = '';
             pendArr.forEach((item, idx) => {
                 const sn = idx + 1;
+                const isPersonalBudget = (item.category && item.category.toLowerCase().includes('personal'))
+                    || (item.reason && item.reason.toLowerCase().includes('personal'));
+                const amtDisplay = isPersonalBudget && item._originalAmount !== item.amount
+                    ? `₹${item.amount} / ₹${item._originalAmount}`
+                    : `₹${item.amount}`;
                 pendHtml += `
                 <div class="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded shadow-sm group">
                     <div>
@@ -1964,7 +2098,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="text-right">
-                            <div class="font-bold text-orange-600 dark:text-orange-400">₹${item.amount}</div>
+                            <div class="font-bold text-orange-600 dark:text-orange-400">${amtDisplay}</div>
                             <div class="text-sm text-orange-500">${item.mode || 'Online'}</div>
                         </div>
                         <button onclick="payItem('${item.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded" title="Mark Paid">
@@ -1988,26 +2122,41 @@
             lucide.createIcons();
         }
 
+        function resolveChartAccount() {
+            let name = null;
+            if (DEFAULT_ACCOUNT_ID && accounts.length > 0) {
+                const defAcc = accounts.find(a => String(a.id) === String(DEFAULT_ACCOUNT_ID));
+                if (defAcc) name = defAcc.account_name;
+            }
+            return name;
+        }
+
         function renderCharts() {
             if (!currentData) return;
+
+            const chartAccountName = resolveChartAccount();
 
             // 1. Aggregate Data
             const categoryTotals = {};
 
-            // Paid Expenses
+            // Paid Expenses (only from default account if set)
             (currentData.paidExpenses || []).forEach(item => {
+                if (chartAccountName && item.account !== chartAccountName) return;
                 const cat = item.category || 'Uncategorized';
                 categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(item.amount);
             });
 
-            // Personal Expenses (Cumulative or Breakdown by category)
+            // Personal Expenses (only from default account if set)
+            const personalItems = (currentData.personalExpenses || []).filter(item => {
+                return !chartAccountName || item.account === chartAccountName;
+            });
             if (expenseChartMode === 'cumulative') {
-                const personalTotal = (currentData.personalExpenses || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
+                const personalTotal = personalItems.reduce((sum, item) => sum + parseFloat(item.amount), 0);
                 if (personalTotal > 0) {
                     categoryTotals['Personal'] = (categoryTotals['Personal'] || 0) + personalTotal;
                 }
             } else {
-                (currentData.personalExpenses || []).forEach(item => {
+                personalItems.forEach(item => {
                     const cat = item.category || 'Personal';
                     categoryTotals[cat] = (categoryTotals[cat] || 0) + parseFloat(item.amount);
                 });
@@ -2214,6 +2363,16 @@
                             alert(err.responseJSON.message || "Error deleting expense");
                         }
                     });
+                } else if (listName === 'income') {
+                    // If this income was created via a fund transfer, also remove linked paid expense
+                    const item = currentData.income.find(i => String(i.id) === String(id));
+                    if (item && item.notes && item.notes.startsWith('__transfer__:')) {
+                        currentData.paidExpenses = (currentData.paidExpenses || []).filter(
+                            pe => pe.notes !== item.notes
+                        );
+                    }
+                    currentData[listName] = currentData[listName].filter(i => String(i.id) !== String(id));
+                    saveData();
                 } else {
                     // Default client-side delete for others
                     currentData[listName] = currentData[listName].filter(i => String(i.id) !== String(id));
@@ -2761,6 +2920,7 @@
                 updateAccountDropdowns();
                 renderAccountsList();
                 if (currentData && currentMonthId) renderUI();
+                renderCharts();
             }).fail(function(xhr) {
                 if (xhr.status === 401) window.location.href = '/login';
             });
