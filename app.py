@@ -5,7 +5,7 @@ import time
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from database_controller import DatabaseController
@@ -21,8 +21,8 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(24).hex()
 # CSRF protection for all state-changing endpoints
 csrf = CSRFProtect(app)
 
-@csrf.error_handler
-def csrf_error_handler(reason):
+@app.errorhandler(CSRFError)
+def csrf_error_handler(error):
     if request.path.startswith('/api/'):
         return jsonify({"status": "error", "message": "CSRF token missing or invalid. Please refresh the page and try again."}), 400
     flash('Session expired or invalid request. Please try again.', 'danger')
@@ -1001,7 +1001,7 @@ def send_otp():
             return jsonify({"status": "error", "message": "No contact information found"}), 400
         target_info = f"Registered Email: {current_user.email}, Phone: {current_user.phone}"
 
-    otp = str(random.randint(100000, 999999))
+    otp = str(secrets.randbelow(900000) + 100000)
     otp_storage[current_user.id] = {
         "otp": otp,
         "expiry": time.time() + 300,
