@@ -778,3 +778,121 @@ class DatabaseController:
             return {row[0]: row[1] for row in cursor.fetchall()}
         finally:
             conn.close()
+
+    # --- Personal Access Tokens (MCP Auth) ---
+
+    def create_pat(self, user_id, name, scope='read_write'):
+        """
+        Creates a new Personal Access Token for a user.
+        Returns the token_id and the raw token value (to show once).
+        """
+        import hashlib, secrets
+        conn = self.get_connection()
+        if not conn: return None
+        try:
+            token_value = 'mt_live_' + secrets.token_hex(32)
+            token_hash = hashlib.sha256(token_value.encode()).hexdigest()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT IFNULL(MAX(id), 0) + 1 as next_id FROM personal_access_tokens WHERE user_id = %s", (user_id,))
+            row = cursor.fetchone()
+            token_id = f"{user_id}_{row['next_id']}"
+            cursor.execute("""
+                INSERT INTO personal_access_tokens (id, user_id, token_hash, name, scope)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (token_id, user_id, token_hash, name, scope))
+            conn.commit()
+            return {"id": token_id, "token": token_value, "name": name, "scope": scope}
+        except Exception as e:
+            print(f"Error creating PAT: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def validate_pat(self, token_value):
+        """
+        Validates a Personal Access Token.
+        Returns user_id dict if valid, None otherwise.
+        """
+        import hashlib
+        if not token_value or not token_value.startswith('mt_live_'):
+            return None
+        conn = self.get_connection()
+        if not conn: return None
+        try:
+            token_hash = hashlib.sha256(token_value.encode()).hexdigest()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT pat.user_id, u.name as user_name, pat.scope
+                FROM personal_access_tokens pat
+                JOIN users u ON pat.user_id = u.id AND u.is_active = TRUE
+                WHERE pat.token_hash = %s AND (pat.expires_at IS NULL OR pat.expires_at > NOW()) AND pat.revoked = FALSE
+            """, (token_hash,))
+            return cursor.fetchone()
+        finally:
+            conn.close()
+
+    def list_pats(self, user_id):
+        """Lists all non-revoked PATs for a user."""
+        conn = self.get_connection()
+        if not conn: return []
+        try:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT id, name, scope, created_at, expires_at, last_used_at
+                FROM personal_access_tokens
+                WHERE user_id = %s AND revoked = FALSE
+                ORDER BY created_at DESC
+            """, (user_id,))
+            return cursor.fetchall()
+        finally:
+            conn.close()
+
+    def revoke_pat(self, user_id, pat_id):
+        """Revokes a Personal Access Token."""
+        conn = self.get_connection()
+        if not conn: return False
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE personal_access_tokens SET revoked = TRUE WHERE id = %s AND user_id = %s", (pat_id, user_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def update_pat_last_used(self, pat_id):
+        """Updates the last_used_at timestamp for a PAT."""
+        conn = self.get_connection()
+        if not conn: return
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE personal_access_tokens SET last_used_at = NOW() WHERE id = %s", (pat_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
+    # --- Audit Log ---
+
+    def log_audit(self, user_id, action, table_name, record_id, details=None, origin='mcp'):
+        """
+        Writes an entry to the audit_log table.
+        :param user_id: The user who performed the action
+        :param action: 'INSERT', 'UPDATE', or 'DELETE'
+        :param table_name: The table affected
+        :param record_id: The record identifier
+        :param details: Optional JSON-serializable dict with extra context
+        :param origin: Source of the action ('mcp', 'web', etc.)
+        """
+        conn = self.get_connection()
+        if not conn: return
+        try:
+            cursor = conn.cursor()
+            details_json = json.dumps(details) if details else None
+            cursor.execute("""
+                INSERT INTO audit_log (user_id, table_name, record_id, action, new_values, origin)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (user_id, table_name, record_id, action, details_json, origin))
+            conn.commit()
+        except Exception as e:
+            print(f"Error writing audit log: {e}")
+        finally:
+            conn.close()

@@ -1,0 +1,259 @@
+Row 1:
+  A1: TOTAL EXPENSE LIST
+  B1: None
+  C1: None
+  D1: None
+  E1: None
+  K1: AVAILABLE FROM PREVIOUS MONTH:
+  L1: 2704.0
+Row 2:
+  A2: PAYMENT REASON
+  B2: PAYMENT CATEGORY
+  C2: DATE
+  D2: PAYMENT AMOUNT
+  E2: None
+  G2: Color Code
+  H2: Category
+  K2: INCOME IN CURRENT MONTH:
+  L2: 162647.0
+Row 3:
+  A3: CC Bill (SBI)
+  B3: CC
+  C3: Online
+  D3: 18982.0
+  E3: None
+  G3: None
+  H3: Bills & EMI
+Row 4:
+  A4: CC Bill (AXIS-1)
+  B4: CC
+  C4: Online
+  D4: 8621.0
+  E4: None
+  G4: None
+  H4: Savings
+  K4: TOTAL AVAILABLE:
+  L4: 165351
+Row 5:
+  A5: CC Bill (AXIS-2)
+  B5: CC
+  C5: Online
+  D5: 10099.0
+  E5: None
+  G5: None
+  H5: Maa
+  K5: CURRENT AVAILABLE BALANCE:
+  L5: 5479
+Row 6:
+  A6: Savings
+  B6: None
+  C6: None
+  D6: 31150
+  E6: None
+  G6: None
+  H6: Personal
+  K6: EXPECTED AVAILABLE BALANCE:
+  L6: -2521
+Row 7:
+  A7: Electricity (HOME)
+  B7: BILL
+  C7: Online
+  D7: 1615.0
+  E7: None
+  G7: None
+  H7: Temp
+Row 8:
+  A8: SIP Temp
+  B8: TEMP1
+  C8: Online
+  D8: 2500.0
+  E8: None
+  F8: None
+  G8: None
+  H8: Family
+Row 9:
+  A9: SIP
+  B9: SAVINGS
+  C9: Online
+  D9: 5500.0
+  E9: None
+  F9: None
+Row 10:
+  A10: Family
+  B10: FAMILY
+  C10: Online
+  D10: 27000.0
+  E10: None
+Row 11:
+  A11: Cook
+  B11: FAMILY
+  C11: Online
+  D11: 4000.0
+  E11: None
+Row 12:
+  A12: Maa
+  B12: Maa
+  C12: Online
+  D12: 4000.0
+  E12: None
+  F12: None
+Row 13:
+  A13: Arghya
+  B13: PERSONAL
+  C13: Online
+  D13: 1529.0
+  E13: None
+  F13: None
+  G13: Personal Expenses
+Row 14:
+  A14: Bangalore Expense
+  B14: PERSONAL
+  C14: Online
+  D14: 182
+  E14: None
+  G14: Type
+  H14: Date
+  I14: Amount
+  L14: None
+Row 15:
+  A15: Office (Puja Wedding)
+  B15: SOCIAL
+  C15: Online
+  D15: 500.0
+  E15: None
+  G15: Food
+Row 16:
+  A16: Flat rent
+  B16: BANGALORE
+  C16: Online
+  D16: 20000.0
+  E16: None
+  G16: Company Food
+Row 17:
+  A17: CC Bill (HDFC)
+  B17: CC
+  C17: Online
+  D17: 6372.0
+  E17: None
+  G17: Rapido
+Row 18:
+  A18: UCO Bank 
+  B18: EMI
+  C18: Online
+  D18: 500.0
+  E18: None
+  G18: Refreshment
+  I18: 47
+Row 19:
+  A19: Sidhu pishemosai
+  D19: 15000.0
+  E19: None
+  G19: FoodBook
+Row 20:
+  A20: Electricity (FLAT)
+  B20: BILL
+  C20: Online
+  D20: 751.0
+  G20: Misc
+  I20: 135
+Row 21:
+  A21: Airport Taxy
+  D21: 1571.0
+  G21: Grocery
+Row 22:
+  G22: Medicine
+Row 23:
+  G23: Chicken & Fish
+Row 24:
+  G24: Water
+Row 25:
+  G25: Gas
+Row 26:
+  G26: Office Party
+  H26: None
+  I26: None
+Row 27:
+  A27: None
+  B27: None
+  C27: None
+  D27: None
+  E27: None
+  G27: Sweets
+Row 28:
+  A28: None
+  B28: None
+  C28: None
+  D28: None
+  G28: Mobile recharge
+  K28: None
+  M28: None
+Row 29:
+  K29: None
+Row 30:
+  A30: None
+  B30: None
+  C30: None
+  D30: None
+Row 32:
+  C32: TOTAL EXPENSE
+  D32: 159872
+  G32: Total
+  H32: None
+  I32: 182
+Row 35:
+  A35: PENDING
+  B35: None
+  C35: None
+  D35: None
+  E35: None
+Row 36:
+  A36: PAYMENT REASON
+  B36: PAYMENT CATEGORY
+  C36: None
+  D36: PAYMENT AMOUNT
+  E36: None
+Row 37:
+  E37: None
+Row 38:
+  A38: Bangalore Expenses
+  B38: PERSONAL
+  C38: None
+  D38: 8000
+  E38: None
+Row 50:
+  E50: None
+Row 54:
+  H54: None
+Row 55:
+  A55: None
+  B55: None
+  C55: None
+  D55: None
+  E55: None
+Row 56:
+  A56: None
+  B56: None
+  C56: None
+  D56: None
+Row 57:
+  A57: None
+  B57: None
+  C57: None
+  D57: None
+Row 68:
+  C68: PENDING EXPENSE
+  D68: 8000
+Row 71:
+  A71: Kaka
+  B71: PENDING
+  D71: 46000
+Row 72:
+  A72: Masi
+  B72: PENDING
+  D72: 25000.0
+Row 73:
+  A73: Babu Kaka
+  B73: PENDING
+  D73: 40000
+Row 82:
+  D82: 111000

@@ -1,0 +1,12 @@
+[Unit]
+Description=Gunicorn instance to serve MTracker
+After=network.target
+
+[Service]
+WorkingDirectory=/home/dwaipayan/MTracker
+Environment="PATH=/home/dwaipayan/MTracker/venv/bin"
+ExecStart=/home/dwaipayan/MTracker/venv/bin/gunicorn --bind 0.0.0.0:80 app:app
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -311,6 +311,7 @@ CREATE TABLE audit_log (
     action ENUM('INSERT', 'UPDATE', 'DELETE') NOT NULL,
     old_values JSON DEFAULT NULL,
     new_values JSON DEFAULT NULL,
+    origin VARCHAR(20) DEFAULT 'web',
     ip_address VARCHAR(45) DEFAULT NULL,
     user_agent VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -319,6 +320,25 @@ CREATE TABLE audit_log (
     INDEX idx_table_name (table_name),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB COMMENT='Audit trail for data changes';
+
+-- ============================================
+-- PERSONAL ACCESS TOKENS (MCP Authentication)
+-- ============================================
+CREATE TABLE personal_access_tokens (
+    id VARCHAR(100) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL DEFAULT 'MCP Token',
+    scope ENUM('read', 'read_write') NOT NULL DEFAULT 'read_write',
+    revoked BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NULL,
+    last_used_at TIMESTAMP NULL,
+
+    INDEX idx_user_id (user_id),
+    INDEX idx_token_hash (token_hash),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Personal Access Tokens for MCP API authentication';
 
 -- ============================================
 -- VIEWS

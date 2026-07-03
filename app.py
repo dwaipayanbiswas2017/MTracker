@@ -2,7 +2,7 @@ import csv
 import io
 import secrets
 import time
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session, Response
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf.csrf import CSRFProtect, CSRFError
@@ -985,6 +985,129 @@ def verify_password():
     if check_password_hash(current_user.password_hash, password):
         return jsonify({"status": "success"})
     return jsonify({"status": "error", "message": "Incorrect password"}), 401
+
+# ─────────────────────────────────────────────────────────
+#  MCP (Model Context Protocol) Server
+# ─────────────────────────────────────────────────────────
+
+from mcp_server import MTrackerMCPServer, sessions
+import uuid
+
+mcp_server = MTrackerMCPServer(db)
+
+def _mcp_authenticate():
+    """Validate Bearer token from Authorization header. Returns user info dict or None."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth[7:]
+    result = db.validate_pat(token)
+    if result:
+        db.update_pat_last_used(token)
+    return result
+
+
+@app.route('/api/mcp/sse', methods=['GET'])
+@csrf.exempt
+def mcp_sse():
+    """SSE endpoint: maintains a persistent connection, sends server → client events."""
+    auth_result = _mcp_authenticate()
+    if not auth_result:
+        return jsonify({"error": "Unauthorized. Provide a valid Bearer token."}), 401
+
+    user_id = auth_result["user_id"]
+    user_name = auth_result.get("user_name", "Unknown")
+    scope = auth_result.get("scope", "read_write")
+
+    session_id = str(uuid.uuid4())
+    session = sessions.create(session_id, user_id, user_name, scope)
+
+    endpoint_url = url_for('mcp_messages', _external=True) + f"?session_id={session_id}"
+
+    def event_stream():
+        try:
+            yield f"event: endpoint\ndata: {endpoint_url}\n\n"
+            while True:
+                responses = session.drain_responses()
+                for resp in responses:
+                    yield f"data: {json.dumps(resp)}\n\n"
+                time.sleep(0.5)
+        except GeneratorExit:
+            pass
+        finally:
+            sessions.remove(session_id)
+
+    return Response(event_stream(), mimetype='text/event-stream')
+
+
+@app.route('/api/mcp/messages', methods=['POST'])
+@csrf.exempt
+def mcp_messages():
+    """Messages endpoint: receives JSON-RPC 2.0 requests from the client."""
+    auth_result = _mcp_authenticate()
+    if not auth_result:
+        return jsonify({"error": "Unauthorized. Provide a valid Bearer token."}), 401
+
+    user_id = auth_result["user_id"]
+    user_name = auth_result.get("user_name", "Unknown")
+    scope = auth_result.get("scope", "read_write")
+    session_id = request.args.get("session_id")
+
+    try:
+        message = request.get_json(force=True)
+    except Exception:
+        return jsonify(mcp_server.dispatch(
+            {"jsonrpc": "2.0", "method": "unknown", "id": None},
+            user_id, user_name, scope
+        ))
+
+    session = sessions.get(session_id) if session_id else None
+    if session:
+        # Session-based: add response to SSE stream
+        responses = mcp_server.dispatch(message, user_id, user_name, scope)
+        for resp in responses:
+            session.add_response(resp)
+        return jsonify({"status": "queued"})
+    else:
+        # No session: return response directly
+        responses = mcp_server.dispatch(message, user_id, user_name, scope)
+        if len(responses) == 1:
+            return jsonify(responses[0])
+        return jsonify(responses)
+
+
+@app.route('/api/mcp/tokens', methods=['POST'])
+@login_required
+def mcp_create_token():
+    """Create a new Personal Access Token for the current user."""
+    name = request.json.get("name", "MCP Token")
+    scope = request.json.get("scope", "read_write")
+    if scope not in ("read", "read_write"):
+        return jsonify({"error": "Scope must be 'read' or 'read_write'"}), 400
+    result = db.create_pat(current_user.id, name, scope)
+    if result:
+        return jsonify({"status": "success", "token": result["token"], "id": result["id"], "name": result["name"], "scope": result["scope"]})
+    return jsonify({"error": "Failed to create token"}), 500
+
+
+@app.route('/api/mcp/tokens', methods=['GET'])
+@login_required
+def mcp_list_tokens():
+    """List all active PATs for the current user."""
+    tokens = db.list_pats(current_user.id)
+    return jsonify(tokens)
+
+
+@app.route('/api/mcp/tokens/<pat_id>', methods=['DELETE'])
+@login_required
+def mcp_revoke_token(pat_id):
+    """Revoke a Personal Access Token."""
+    if db.revoke_pat(current_user.id, pat_id):
+        return jsonify({"status": "success", "message": "Token revoked."})
+    return jsonify({"error": "Token not found."}), 404
+
+
+# ─────────────────────────────────────────────────────────
 
 @app.route('/api/send_otp', methods=['POST'])
 @login_required
