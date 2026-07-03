@@ -1,5 +1,6 @@
 <!-- Floating Chat Widget -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.0/purify.min.js"></script>
 <style>
 .cw-overlay {
     position: fixed;
@@ -298,7 +299,7 @@
 
             const agentDiv = document.createElement('div');
             agentDiv.className = 'cw-msg agent';
-            agentDiv.innerHTML = '<div class="markdown">' + marked.parse(data.error || data.reply) + '</div>';
+            agentDiv.innerHTML = '<div class="markdown">' + DOMPurify.sanitize(marked.parse(data.error || data.reply || '')) + '</div>';
             cwBody.appendChild(agentDiv);
         } catch {
             cwTyping.classList.remove('show');

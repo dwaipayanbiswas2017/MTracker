@@ -17,6 +17,7 @@
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.0/purify.min.js"></script>
     <style>
         :root { --bg: #f8fafc; --text: #0f172a; --card: #ffffff; --input: #ffffff; --input-border: #cbd5e1; --input-text: #0f172a; --border: #e2e8f0; }
         .dark { --bg: #0f172a; --text: #f1f5f9; --card: #1e293b; --input: #1e293b; --input-border: #334155; --input-text: #f1f5f9; --border: #334155; }
@@ -195,7 +196,7 @@
                 inner.innerHTML =
                     '<div class="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5"><i data-lucide="bot" class="w-3.5 h-3.5 text-blue-500"></i></div>' +
                     '<div class="min-w-0"><p class="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-0.5">Assistant</p>' +
-                    '<div class="markdown text-sm">' + marked.parse(text) + '</div></div>';
+                    '<div class="markdown text-sm">' + DOMPurify.sanitize(marked.parse(text || '')) + '</div></div>';
             } else {
                 inner.textContent = text;
             }
