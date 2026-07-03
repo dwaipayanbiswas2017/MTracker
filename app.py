@@ -1,6 +1,6 @@
 import csv
 import io
-import random
+import secrets
 import time
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from datetime import datetime
@@ -15,7 +15,9 @@ import os
 # Load environment variables from .env file
 dotenv.load_dotenv()
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # Change this in production
+app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(24).hex()
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'profile_pics')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB limit
 
@@ -26,8 +28,6 @@ DB_CONFIG = {
     'password': os.getenv('password'),
     'database': os.getenv('database')
 }
-
-print(f"DB_Config: {DB_CONFIG}")
 
 db = DatabaseController(DB_CONFIG)
 
@@ -234,10 +234,13 @@ def forgot_password_send_otp():
         return jsonify({"status": "error", "message": "Email or Phone is required"}), 400
 
     user_data = db.get_user_by_identifier(identifier)
-    if not user_data:
-        return jsonify({"status": "error", "message": "User not found"}), 404
 
-    otp = str(random.randint(100000, 999999))
+    otp = str(secrets.randbelow(900000) + 100000)
+
+    if not user_data:
+        # Mask existence: still store a dummy OTP to consume attacker's time
+        otp_storage[identifier] = {"otp": otp, "expiry": time.time() + 300, "user_id": None}
+        return jsonify({"status": "success", "message": "If this account exists, a recovery code has been sent."})
     otp_storage[identifier] = {
         "otp": otp,
         "expiry": time.time() + 300,
@@ -259,7 +262,7 @@ def forgot_password_send_otp():
     else:
         # SMS Mocking
         print(f"[MOCK SMS] Recovery OTP {otp} sent to {identifier}")
-        return jsonify({"status": "success", "message": "Recovery code sent via SMS (Mocked).", "otp_mock": otp})
+        return jsonify({"status": "success", "message": "Recovery code sent via SMS."})
 
 @app.route('/api/forgot_password/reset', methods=['POST'])
 def forgot_password_reset():
@@ -1049,4 +1052,4 @@ def verify_otp():
     return jsonify({"status": "error", "message": "Invalid OTP"}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true', host='0.0.0.0')
