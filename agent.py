@@ -42,6 +42,8 @@ class AgentDeps:
     """Runtime dependencies passed to every agent tool call."""
     user_id: str
     db: Any  # DatabaseController instance
+    user_name: str = "User"
+    currency: str = "INR"
 
 
 # ─────────────────────────────────────────────────────────
@@ -135,7 +137,7 @@ def _audit(ctx: RunContext[AgentDeps], action: str, table: str, record_id: str, 
 # ─────────────────────────────────────────────────────────
 
 async def tool_get_summary(ctx: RunContext[AgentDeps], month_key: str) -> str:
-    """Get a high-level financial summary (income, expenses, balance) for a month. Use YYYY-MM format for month_key."""
+    """Get a high-level financial summary for a month including income, paid expenses, personal/daily expenses, per-account opening balances, and net balance. Personal expenses (daily log entries like pocket cash, minor spends) are included in total expenses. Use YYYY-MM format for month_key."""
     data = _read_month(ctx, month_key)
     if data is None:
         return f"Month {month_key} not found. Use create_month first."
@@ -145,22 +147,27 @@ async def tool_get_summary(ctx: RunContext[AgentDeps], month_key: str) -> str:
     ob = data.get("openingBalance", {})
     total_opening = sum(float(v) for v in ob.values()) if isinstance(ob, dict) else float(ob or 0)
     total_expenses = total_paid + total_personal
+    currency = ctx.deps.currency
+
+    # Per-account opening balance
+    ob_lines = "\n".join(f"    {acc}: {amt} {currency}" for acc, amt in ob.items()) if ob else "    (none)"
+
     return (
-        f"Summary for {month_key}:\n"
-        f"  Opening Balance: {total_opening}\n"
-        f"  Income: {total_income}\n"
-        f"  Expenses (Paid): {total_paid}\n"
-        f"  Expenses (Personal): {total_personal}\n"
-        f"  Total Expenses: {total_expenses}\n"
-        f"  Net Balance: {total_opening + total_income - total_expenses}\n"
-        f"  Transactions: {len(data['paidExpenses']) + len(data['personalExpenses'])}\n"
+        f"Summary for {month_key} ({currency}):\n"
+        f"  Opening Balance by Account:\n{ob_lines}\n"
+        f"  Total Opening: {total_opening} {currency}\n"
+        f"  Income: {total_income} {currency}\n"
+        f"  Paid Expenses: {total_paid} {currency} ({len(data['paidExpenses'])} txns)\n"
+        f"  Personal/Daily Expenses: {total_personal} {currency} ({len(data['personalExpenses'])} txns)\n"
+        f"  Total Expenses: {total_expenses} {currency}\n"
+        f"  Net Balance: {total_opening + total_income - total_expenses} {currency}\n"
         f"  Pending Items: {len(data['pendingExpenses'])}\n"
         f"  Notes: {len(data['notes'])}"
     )
 
 
 async def tool_get_month_data(ctx: RunContext[AgentDeps], month_key: str) -> str:
-    """Get the full state of a month including all income, paid expenses, pending items, and notes."""
+    """Get the full state of a month including all income, paid expenses, personal/daily expenses, pending items, notes, and per-account opening balances."""
     data = ctx.deps.db.get_month_data(ctx.deps.user_id, month_key)
     if data is None:
         return f"Month {month_key} not found."
@@ -168,7 +175,7 @@ async def tool_get_month_data(ctx: RunContext[AgentDeps], month_key: str) -> str
 
 
 async def tool_add_paid_expense(ctx: RunContext[AgentDeps], month_key: str, amount: float, reason: str, category: str, account: str, date: str = None) -> str:
-    """Record a completed (paid) transaction. amount, reason, category, and account are required. Date defaults to today."""
+    """Record a completed regular (non-daily) expense transaction. For personal/daily small spends, use a different approach. amount, reason, category, and account are required. Date defaults to today."""
     data = _read_month(ctx, month_key)
     if data is None:
         return f"Month {month_key} not found. Use create_month first."
@@ -468,6 +475,47 @@ async def tool_add_note(ctx: RunContext[AgentDeps], month_key: str, title: str, 
     return "Failed to save note."
 
 
+async def tool_get_account_balances(ctx: RunContext[AgentDeps], month_key: str) -> str:
+    """Get the running balance for each account in a given month. Computed as: opening balance + total income - total paid expenses (including personal/daily expenses) per account. Use YYYY-MM format for month_key."""
+    data = _read_month(ctx, month_key)
+    if data is None:
+        return f"Month {month_key} not found."
+    currency = ctx.deps.currency
+
+    ob = data.get("openingBalance", {})
+    if not isinstance(ob, dict):
+        ob = {}
+
+    # Track per-account income
+    account_income: dict[str, float] = {}
+    for inc in data["income"]:
+        acct = inc.get("account", "Cash")
+        account_income[acct] = account_income.get(acct, 0) + float(inc["amount"])
+
+    # Track per-account expenses (paid + personal)
+    account_expense: dict[str, float] = {}
+    for exp in data["paidExpenses"]:
+        acct = exp.get("account", "Cash")
+        account_expense[acct] = account_expense.get(acct, 0) + float(exp["amount"])
+    for exp in data["personalExpenses"]:
+        acct = exp.get("account", "Cash")
+        account_expense[acct] = account_expense.get(acct, 0) + float(exp["amount"])
+
+    all_accounts = set(list(ob.keys()) + list(account_income.keys()) + list(account_expense.keys()))
+    if not all_accounts:
+        return f"No account data for {month_key}."
+
+    lines = [f"Account Balances for {month_key} ({currency}):"]
+    for acct in sorted(all_accounts):
+        op = float(ob.get(acct, 0))
+        inc = account_income.get(acct, 0)
+        exp = account_expense.get(acct, 0)
+        balance = op + inc - exp
+        lines.append(f"  {acct}: {balance} {currency} (opening: {op}, income: {inc}, expenses: {exp})")
+
+    return "\n".join(lines)
+
+
 async def tool_get_profile(ctx: RunContext[AgentDeps]) -> str:
     """Get user profile settings (name, currency, default account)."""
     user = ctx.deps.db.get_user_by_id(ctx.deps.user_id)
@@ -502,6 +550,7 @@ async def tool_update_profile(ctx: RunContext[AgentDeps], name: str = None, curr
 AGENT_TOOLS = [
     tool_get_summary,
     tool_get_month_data,
+    tool_get_account_balances,
     tool_add_paid_expense,
     tool_add_income,
     tool_add_pending_item,
@@ -555,11 +604,12 @@ def create_agent(
 
     system_prompt = system_prompt or (
         "You are a helpful financial assistant for MTracker, "
-        "a personal expense tracking application. You have access to MCP tools "
-        "that let you read and write the user's financial data. "
-        "Use these tools when the user asks about their finances, "
-        "wants to record transactions, or needs budget insights. "
-        "Always confirm before writing data. "
+        "a personal expense tracking application. You have MCP tools "
+        "to read and write the user's financial data. "
+        "There are TWO types of expenses: regular paid expenses and personal/daily expenses "
+        "(small daily spends logged as daily logs). Both count toward total expenses. "
+        "Use tools when the user asks about finances, wants to record transactions, "
+        "or needs budget insights. Always confirm before writing data. "
         "Answer clearly and concisely."
     )
 
@@ -588,25 +638,44 @@ def get_response(
 ) -> str:
     """Send a message to the agent and return its text reply.
 
-    The agent has access to MCP tools that operate on the user's data.
+    Automatically loads user profile for currency, name, and default account.
+    Injects today's date and user's currency as per-call instructions
+    (so cached agents always have fresh context).
     Conversation history is maintained per model.
     """
     global _agent_cache
     model_id = model_id or NVIDIA_DEFAULT_MODEL
     key = f"{provider}:{model_id}"
 
+    # Load user profile for dynamic context
+    user = db.get_user_by_id(user_id) if db else None
+    user_name = user.get("name", "User") if user else "User"
+    currency = user.get("currency_pref", "INR") if user else "INR"
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    current_month = datetime.now().strftime("%Y-%m")
+
     if key not in _agent_cache:
         create_agent(provider=provider, model_id=model_id, api_key=api_key)
 
     entry = _agent_cache[key]
     agent = entry["agent"]
-    deps = AgentDeps(user_id=user_id, db=db)
+    deps = AgentDeps(user_id=user_id, db=db, user_name=user_name, currency=currency)
+
+    # Per-call instructions (always fresh — not cached with the agent)
+    instructions = (
+        f"You are helping {user_name}. Today's date is {today} "
+        f"(current month: {current_month}). The user's currency is {currency}. "
+        f"Always use {currency} when discussing amounts. "
+        f"Month keys use YYYY-MM format (e.g., '{current_month}' for this month)."
+    )
 
     try:
         result = agent.run_sync(
             message,
             message_history=entry["history"],
             deps=deps,
+            instructions=instructions,
             model_settings={"max_tokens": 1024},
         )
     except (IndexError, ValueError) as e:
