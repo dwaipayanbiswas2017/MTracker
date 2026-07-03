@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Profile - MTracker</title>
 
     <script>
@@ -33,6 +34,11 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- JQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $.ajaxSetup({
+            headers: { 'X-CSRFToken': $('meta[name="csrf-token"]').attr('content') }
+        });
+    </script>
 
     <style>
         :root {
@@ -250,6 +256,8 @@
             {% endwith %}
 
             <form id="profile-form" action="{{ url_for('profile') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                {{ form.hidden_tag() if form is defined else '' }}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <!-- Profile Pic -->
                 <div class="flex flex-col items-center">
                     <div class="relative group">

@@ -96,6 +96,7 @@
             {% endif %}
         {% endwith %}
         <form action="/login" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Email or Phone</label>
                 <input type="text" name="username" required class="input-field" placeholder="Enter Email or Phone number">

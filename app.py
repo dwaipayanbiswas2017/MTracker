@@ -5,6 +5,7 @@ import time
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from database_controller import DatabaseController
@@ -16,6 +17,16 @@ import os
 dotenv.load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(24).hex()
+
+# CSRF protection for all state-changing endpoints
+csrf = CSRFProtect(app)
+
+@csrf.error_handler
+def csrf_error_handler(reason):
+    if request.path.startswith('/api/'):
+        return jsonify({"status": "error", "message": "CSRF token missing or invalid. Please refresh the page and try again."}), 400
+    flash('Session expired or invalid request. Please try again.', 'danger')
+    return redirect(url_for('index'))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'profile_pics')

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Admin Dashboard - MTracker</title>
 
     <script>
@@ -33,6 +34,11 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- JQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $.ajaxSetup({
+            headers: { 'X-CSRFToken': $('meta[name="csrf-token"]').attr('content') }
+        });
+    </script>
 
     <style>
         :root {
@@ -263,6 +269,7 @@
                 </div>
                 
                 <form id="mailSettingsForm" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">SMTP Server</label>
                         <input type="text" name="smtp_server" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 w-full text-sm outline-none focus:border-purple-500" placeholder="smtp.gmail.com">
