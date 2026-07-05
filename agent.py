@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+import httpx
 from dotenv import load_dotenv
 
 from pydantic_ai import Agent, RunContext
@@ -68,7 +69,8 @@ def make_model(model_id: str, provider_name: str, api_key: str | None = None):
         if not key:
             raise ValueError(f"{env_key} is not set. Please set it in your .env file or environment.")
 
-        provider = OpenAIProvider(base_url=base_url, api_key=key)
+        http_client = httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0))
+        provider = OpenAIProvider(base_url=base_url, api_key=key, http_client=http_client)
         return OpenAIChatModel(model_id, provider=provider)
 
     return f"{provider_name}:{model_id}"
