@@ -3,7 +3,8 @@
 ## Run commands
 - Dev: `python app.py` (0.0.0.0:5000)
 - Production: `systemctl --user restart mtracker.service` (Gunicorn via systemd user service)
-- `journalctl --user -u mtracker.service -f` for logs
+  - 3 workers, 120s timeout (see `/home/dwaipayan/.config/systemd/user/mtracker.service`)
+- Logs: `tail -f /home/dwaipayan/MTracker/logs/access.log` and `tail -f /home/dwaipayan/MTracker/logs/error.log`
 
 ## Stack
 Python Flask (single `app.py` + `database_controller.py`), MySQL, jQuery inline in `templates/index.html`, Tailwind CSS (CDN), Chart.js, html2pdf, Lucide icons.

@@ -679,22 +679,25 @@
                     <!-- Add Personal Form (Hidden by default) -->
                     <div class="add-form-container" id="personal-form">
                         <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <div class="grid grid-cols-2 md:flex gap-2">
-                                <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark col-span-2 md:flex-grow">
+                            <div class="grid grid-cols-2 md:grid-cols-12 gap-2">
+                                <input type="text" id="newPersReason" placeholder="Item (e.g. Rapido)" class="input-dark col-span-2 md:col-span-3">
 
-                                <select id="newPersCategory" class="input-dark col-span-1 md:w-32">
-                                    <option value="">Category...</option>
-                                </select>
+                                <div class="col-span-2 md:col-span-2 flex gap-1">
+                                    <select id="newPersCategory" class="input-dark w-full">
+                                        <option value="">Category...</option>
+                                    </select>
+                                    <button onclick="addNewCategory()" class="btn-add bg-blue-500 hover:bg-blue-600 text-white shrink-0" title="Add Category">+</button>
+                                </div>
 
-                                <select id="newPersAccount" class="input-dark col-span-1 md:w-32">
+                                <select id="newPersAccount" class="input-dark col-span-1 md:col-span-2">
                                     <option value="">Account...</option>
                                 </select>
-                                <div class="col-span-1 md:w-32 relative">
+                                <div class="col-span-1 md:col-span-2 relative">
 
                                     <input type="date" id="newPersDate" class="input-dark w-full date-input">
                                     <span class="date-placeholder md:hidden">Date</span>
                                 </div>
-                                <input type="number" id="newPersAmount" placeholder="₹" class="input-dark col-span-1 md:w-24">
+                                <input type="number" id="newPersAmount" placeholder="₹" class="input-dark col-span-1 md:col-span-2">
                                 <button onclick="addPersonal()" class="btn-add bg-blue-500 hover:bg-blue-600 text-white"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
                         </div>
