@@ -15,7 +15,10 @@ MTracker is a professional personal finance management application designed to h
 -   **CSV Import**: Batch import transaction data from CSV files for rapid entry.
 -   **PDF Export**: Generate professional monthly statements in PDF format with automatic charts.
 -   **Profile Management**: Update profile pictures, manage contact info with OTP verification, and set currency/account preferences.
--   **Admin Panel & System Settings**: Global oversight with user management and system-wide configuration (e.g., SMTP settings) via a dedicated dashboard.
+-   **Admin Panel & System Settings**: Global oversight with user management, system-wide SMTP configuration, and database backup management via a dedicated dashboard.
+-   **Database Backup & Restore**: Create manual backups, schedule automatic daily backups (configurable time), restore from any backup file, download backups, and email backup files to admin users — all from the admin panel.
+-   **AI Assistant**: Built-in AI chat assistant (floating chat widget) powered by NVIDIA AI models that answers questions about your financial data using natural language.
+-   **MCP Server**: Model Context Protocol (MCP) server with 25 tools and PAT-based authentication for AI agent integration.
 -   **Modern Dynamic UI**: Clean, tactile interface with a consistent theme engine supporting Light and Dark modes. Password visibility toggle on login/register.
 -   **Secure Authentication**: Role-based access control with secure password hashing and dual-identifier (Email/Phone) login.
 
@@ -50,6 +53,16 @@ MTracker is a professional personal finance management application designed to h
 -   **`/api/long_pending/<item_id>`**: Remove a debt track (DELETE).
 -   **`/api/long_pending/<item_id>/partial_payment`**: Record partial debt clearances (POST).
 
+### AI Assistant
+-   **`/api/chat`**: Send a natural language query about your finances and get an AI-generated response (POST).
+-   **`/api/models`**: List available AI models for the chat assistant (GET).
+
+### MCP Server (Model Context Protocol)
+-   **`/api/mcp/sse`**: SSE stream endpoint for MCP client connections (GET).
+-   **`/api/mcp/messages`**: JSON-RPC message endpoint for MCP client requests (POST).
+-   **`/api/mcp/tokens`**: Create and list Personal Access Tokens for MCP auth (GET/POST).
+-   **`/api/mcp/tokens/<pat_id>`**: Revoke a Personal Access Token (DELETE).
+
 ### Administration & Settings
 -   **`/admin`**: Global dashboard overview for system administrators (GET).
 -   **`/admin/toggle_user/<user_id>`**: Enable/Disable system access (POST).
@@ -57,13 +70,23 @@ MTracker is a professional personal finance management application designed to h
 -   **`/admin/delete_user/<user_id>`**: Permanent cascading deletion of user data (POST).
 -   **`/api/admin/settings/mail`**: Manage system-wide SMTP settings (GET/POST).
 -   **`/api/admin/settings/mail/test`**: Verify SMTP configuration with a test email (POST).
+-   **`/admin/backup`**: Create a manual database backup (POST).
+-   **`/admin/backups`**: List all backup files (GET).
+-   **`/admin/backup/<filename>/download`**: Download a backup file (GET).
+-   **`/admin/backup/<filename>/restore`**: Restore the database from a backup (POST).
+-   **`/admin/backup/<filename>/delete`**: Delete a backup file (POST).
+-   **`/admin/backup/<filename>/email`**: Email a backup file to all admin users (POST).
+-   **`/admin/backup/schedule`**: Get or set the automatic backup schedule (GET/POST).
+-   **`/admin/backup/check-schedule`**: Manually trigger a scheduled backup check (POST).
 
 ## Tech Stack
 
--   **Backend**: Python 3.x, Flask (Web Framework)
--   **Frontend**: HTML5, Tailwind CSS (Styling), jQuery (AJAX & DOM), Lucide (Icons)
+-   **Backend**: Python 3.x, Flask (Web Framework), Gunicorn (Production WSGI)
+-   **Frontend**: HTML5, Tailwind CSS (CDN), jQuery (AJAX & DOM), Lucide (Icons), Chart.js, html2pdf
 -   **Database**: MySQL 8.0+ (Transactions, Users, Persistent State)
--   **Authentication & Mail**: Flask-Login, Flask-Mail, Werkzeug (Security)
+-   **Authentication & Mail**: Flask-Login, Flask-WTF (CSRF), smtplib (Email)
+-   **AI Agent**: Pydantic AI, NVIDIA AI API, SSE Streaming
+-   **MCP**: Model Context Protocol (SSE transport, JSON-RPC 2.0, PAT auth)
 
 ## Setup & Installation
 
@@ -100,7 +123,7 @@ MTracker is a professional personal finance management application designed to h
     ```
     For production, use Gunicorn:
     ```bash
-    gunicorn --bind 0.0.0.0:5000 app:app
+    gunicorn --workers 3 --timeout 120 --bind 0.0.0.0:5000 app:app
     ```
 
 ## Production Deployment (Auto-start on Boot)
@@ -138,6 +161,7 @@ To ensure MTracker starts automatically on boot, a `systemd` service is provided
 ## Initial Configuration
     - Visit `http://localhost:5000` to register.
     - If you are an admin, configure SMTP settings in the Admin Panel to enable email features like OTP and Password Recovery.
+    - For the AI Assistant to work, set your NVIDIA AI API key in the `.env` file: `NVIDIA_API_KEY=your_key_here`.
 
 ## Usage
 
@@ -146,6 +170,8 @@ To ensure MTracker starts automatically on boot, a `systemd` service is provided
 3.  **Configure Accounts**: Add your bank accounts or physical wallets in the "Accounts" section. Set a default account in Profile for chart filtering and auto-selection.
 4.  **Manage Transactions**: Use the dashboard to record income, expenses, track pending items, and transfer funds between accounts via the Transfer button in the balance card.
 5.  **Analyze & Export**: Use the built-in Expense Analysis chart (toggle All/Default view) for visual analysis or export a professional PDF report for your records.
+6.  **Backup**: Use the Admin Panel to create manual backups, schedule automatic daily backups, restore from backups, or email backups to admin users.
+7.  **AI Assistant**: Click the chat button (bottom-right) to ask natural language questions about your finances.
 
 ## License
 
