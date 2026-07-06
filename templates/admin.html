@@ -373,13 +373,13 @@
                                 </td>
                                 <td>
                                     <div class="flex gap-2">
-                                        <button onclick="toggleAdmin('{{ user.id }}', {{ user.name | tojson }}, {{ 'true' if user.is_admin else 'false' }})" class="btn-action {% if user.is_admin %}text-blue-500 bg-blue-500/10 hover:bg-blue-500/20{% else %}text-slate-500 bg-slate-500/10 hover:bg-slate-500/20{% endif %}" title="{% if user.is_admin %}Demote from Admin{% else %}Promote to Admin{% endif %}">
+                                        <button onclick='toggleAdmin("{{ user.id }}", {{ user.name | tojson }}, {{ "true" if user.is_admin else "false" }})' class="btn-action {% if user.is_admin %}text-blue-500 bg-blue-500/10 hover:bg-blue-500/20{% else %}text-slate-500 bg-slate-500/10 hover:bg-slate-500/20{% endif %}" title="{% if user.is_admin %}Demote from Admin{% else %}Promote to Admin{% endif %}">
                                             <i data-lucide="shield{% if user.is_admin %}-off{% endif %}" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="toggleUser('{{ user.id }}', {{ user.name | tojson }})" class="btn-action {% if user.is_active %}text-orange-500 bg-orange-500/10 hover:bg-orange-500/20{% else %}text-green-500 bg-green-500/10 hover:bg-green-500/20{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Reactivate{% endif %}">
+                                        <button onclick='toggleUser("{{ user.id }}", {{ user.name | tojson }})' class="btn-action {% if user.is_active %}text-orange-500 bg-orange-500/10 hover:bg-orange-500/20{% else %}text-green-500 bg-green-500/10 hover:bg-green-500/20{% endif %}" title="{% if user.is_active %}Deactivate{% else %}Reactivate{% endif %}">
                                             <i data-lucide="{% if user.is_active %}user-minus{% else %}user-plus{% endif %}" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="deleteUser('{{ user.id }}', {{ user.name | tojson }})" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete Permanently">
+                                        <button onclick='deleteUser("{{ user.id }}", {{ user.name | tojson }})' class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete Permanently">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
                                     </div>
@@ -429,6 +429,13 @@
                                 <span class="ml-2 text-xs font-medium text-slate-600 dark:text-slate-400">Enabled</span>
                             </label>
                         </div>
+                        <div class="flex items-center gap-2 pb-1">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="backupEmailEnabled" class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                                <span class="ml-2 text-xs font-medium text-slate-600 dark:text-slate-400">Email to Admins</span>
+                            </label>
+                        </div>
                         <button id="saveScheduleBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded shadow active:translate-y-0.5 transition-all text-sm">
                             Save Schedule
                         </button>
@@ -459,7 +466,7 @@
                         </thead>
                         <tbody id="backupTableBody">
                             <tr id="backupLoadingRow">
-                                <td colspan="4" class="text-center text-slate-500 py-8">
+                                <td colspan="5" class="text-center text-slate-500 py-8">
                                     <i data-lucide="loader-2" class="w-5 h-5 animate-spin inline-block"></i>
                                     <span class="ml-2">Loading backups...</span>
                                 </td>
@@ -649,7 +656,8 @@
             $('#saveScheduleBtn').click(function() {
                 const data = {
                     enabled: $('#backupEnabled').is(':checked'),
-                    backup_time: $('#backupTime').val()
+                    backup_time: $('#backupTime').val(),
+                    email_enabled: $('#backupEmailEnabled').is(':checked')
                 };
                 $.ajax({
                     url: '/admin/backup/schedule',
@@ -686,7 +694,7 @@
                 const tbody = $('#backupTableBody');
                 $('#backupCount').text(backups.length + ' file(s)');
                 if (backups.length === 0) {
-                    tbody.html('<tr><td colspan="4" class="text-center text-slate-500 py-8"><i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i><br>No backups yet</td></tr>');
+                    tbody.html('<tr><td colspan="5" class="text-center text-slate-500 py-8"><i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i><br>No backups yet</td></tr>');
                     lucide.createIcons();
                     return;
                 }
@@ -704,12 +712,13 @@
                         + '<a href="/admin/backup/' + encoded + '/download" class="btn-action text-blue-500 bg-blue-500/10 hover:bg-blue-500/20" title="Download"><i data-lucide="download" class="w-4 h-4"></i></a>'
                         + '<button onclick="restoreBackup(\'' + encoded + '\', \'' + b.filename.replace(/'/g, "\\'") + '\')" class="btn-action text-amber-500 bg-amber-500/10 hover:bg-amber-500/20" title="Restore"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></button>'
                         + '<button onclick="deleteBackup(\'' + encoded + '\', \'' + b.filename.replace(/'/g, "\\'") + '\')" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>'
+                        + '<button onclick="emailBackup(\'' + encoded + '\', this)" class="btn-action text-purple-500 bg-purple-500/10 hover:bg-purple-500/20" title="Email to Admins"><i data-lucide="mail" class="w-4 h-4"></i></button>'
                         + '</div></td></tr>';
                 });
                 tbody.html(html);
                 lucide.createIcons();
             }).fail(function() {
-                $('#backupTableBody').html('<tr><td colspan="4" class="text-center text-rose-500 py-8">Failed to load backups</td></tr>');
+                $('#backupTableBody').html('<tr><td colspan="5" class="text-center text-rose-500 py-8">Failed to load backups</td></tr>');
             });
         }
 
@@ -717,6 +726,7 @@
             $.get('/admin/backup/schedule', function(sched) {
                 $('#backupEnabled').prop('checked', sched.enabled);
                 $('#backupTime').val(sched.backup_time);
+                $('#backupEmailEnabled').prop('checked', sched.email_enabled);
                 let html = '';
                 if (sched.last_run) {
                     html += '<span class="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded"><b>Last:</b> ' + sched.last_run + '</span>';
@@ -727,6 +737,9 @@
                     html += ' <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded"><b>Next:</b> ' + sched.next_backup + '</span>';
                 } else if (!sched.enabled) {
                     html += ' <span class="text-amber-500">(Scheduled backup is disabled)</span>';
+                }
+                if (sched.email_enabled) {
+                    html += ' <span class="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-1 rounded"><b>Email:</b> On</span>';
                 }
                 $('#scheduleStatus').html(html);
             });
@@ -789,6 +802,26 @@
             });
         }
 
+        function emailBackup(encoded, el) {
+            const btn = $(el);
+            btn.prop('disabled', true).html('<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            $.ajax({
+                url: '/admin/backup/' + encoded + '/email',
+                type: 'POST',
+                success: function(res) {
+                    showToast(res.message);
+                    btn.prop('disabled', false).html('<i data-lucide="mail" class="w-4 h-4"></i>');
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                },
+                error: function(xhr) {
+                    showToast(xhr.responseJSON?.message || 'Email failed', true);
+                    btn.prop('disabled', false).html('<i data-lucide="mail" class="w-4 h-4"></i>');
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                }
+            });
+        }
+
         function showToast(message, isError = false) {
             const toast = $('#toast');
             $('#toastMsg').text(message);
@@ -837,6 +870,34 @@
             $('#adminConfirmModal').addClass('hidden').removeClass('flex');
         }
 
+        function _getCSRF() {
+            return $('meta[name="csrf-token"]').attr('content') || '';
+        }
+
+        function _adminAjax(url, btn) {
+            const csrf = _getCSRF();
+            if (!csrf) { showToast('CSRF token missing. Reload the page.', true); closeConfirmModal(); return; }
+            btn.prop('disabled', true).text('Processing...');
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: { 'X-CSRFToken': csrf },
+                success: function(res) {
+                    if (res.status === 'success') {
+                        location.reload();
+                    } else {
+                        showToast(res.message);
+                        closeConfirmModal();
+                    }
+                },
+                error: function(xhr) {
+                    const msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Request failed. Check server logs.';
+                    showToast(msg, true);
+                    closeConfirmModal();
+                }
+            });
+        }
+
         function toggleAdmin(id, name, isAdmin) {
             const action = isAdmin ? 'Demote from Admin' : 'Promote to Admin';
             const message = isAdmin
@@ -849,24 +910,13 @@
                 ? 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-blue-500/10 text-blue-500'
                 : 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-blue-600/10 text-blue-600');
             $('#confirmIcon').attr('data-lucide', isAdmin ? 'shield-off' : 'shield-check');
-
             $('#confirmBtn').text('Confirm').attr('class', 'flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-blue-500/20');
-
             $('#adminConfirmModal').removeClass('hidden').addClass('flex');
-            lucide.createIcons();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            $('#confirmBtn').off('click').on('click', function() {
-                $.post(`/admin/toggle_admin/${id}`, function(res) {
-                    if (res.status === 'success') {
-                        location.reload();
-                    } else {
-                        showToast(res.message);
-                        closeConfirmModal();
-                    }
-                }).fail(err => {
-                    showToast(err.responseJSON.message || "Error toggling admin status");
-                    closeConfirmModal();
-                });
+            const btn = $('#confirmBtn');
+            btn.off('click').on('click', function() {
+                _adminAjax(`/admin/toggle_admin/${id}`, btn);
             });
         }
 
@@ -875,24 +925,13 @@
             $('#confirmMessage').text(`Are you sure you want to change the status for ${name}?`);
             $('#confirmIconContainer').attr('class', 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-orange-500/10 text-orange-500');
             $('#confirmIcon').attr('data-lucide', 'user-check');
-
             $('#confirmBtn').text('Confirm Change').attr('class', 'flex-1 bg-orange-600 hover:bg-orange-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-orange-500/20');
-
             $('#adminConfirmModal').removeClass('hidden').addClass('flex');
-            lucide.createIcons();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            $('#confirmBtn').off('click').on('click', function() {
-                $.post(`/admin/toggle_user/${id}`, function(res) {
-                    if (res.status === 'success') {
-                        location.reload();
-                    } else {
-                        showToast(res.message);
-                        closeConfirmModal();
-                    }
-                }).fail(err => {
-                    showToast(err.responseJSON.message || "Error toggling status");
-                    closeConfirmModal();
-                });
+            const btn = $('#confirmBtn');
+            btn.off('click').on('click', function() {
+                _adminAjax(`/admin/toggle_user/${id}`, btn);
             });
         }
 
@@ -901,24 +940,13 @@
             $('#confirmMessage').html(`Careful! This will delete <strong>${name}</strong> and all their financial records permanently. This action cannot be undone.`);
             $('#confirmIconContainer').attr('class', 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-rose-500/10 text-rose-500');
             $('#confirmIcon').attr('data-lucide', 'trash-2');
-
             $('#confirmBtn').text('DELETE FOREVER').attr('class', 'flex-1 bg-rose-600 hover:bg-rose-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-rose-500/20');
-
             $('#adminConfirmModal').removeClass('hidden').addClass('flex');
-            lucide.createIcons();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            $('#confirmBtn').off('click').on('click', function() {
-                $.post(`/admin/delete_user/${id}`, function(res) {
-                    if (res.status === 'success') {
-                        location.reload();
-                    } else {
-                        showToast(res.message);
-                        closeConfirmModal();
-                    }
-                }).fail(err => {
-                    showToast(err.responseJSON.message || "Error deleting user");
-                    closeConfirmModal();
-                });
+            const btn = $('#confirmBtn');
+            btn.off('click').on('click', function() {
+                _adminAjax(`/admin/delete_user/${id}`, btn);
             });
         }
     </script>

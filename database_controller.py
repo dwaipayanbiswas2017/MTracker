@@ -675,6 +675,19 @@ class DatabaseController:
         finally:
             conn.close()
 
+    def get_admin_users_with_email(self):
+        """Returns admin users who have an email address set."""
+        conn = self.get_connection()
+        if not conn: return []
+        try:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT id, name, email FROM users WHERE is_admin = 1 AND email IS NOT NULL AND email != ''"
+            )
+            return cursor.fetchall()
+        finally:
+            conn.close()
+
     def toggle_user_status(self, user_id):
         """Deactivates/Reactivates a user."""
         conn = self.get_connection()
@@ -1037,6 +1050,7 @@ class DatabaseController:
         enabled = self.get_system_setting('backup_enabled', '0') == '1'
         backup_time = self.get_system_setting('backup_time', '02:00')
         last_run = self.get_system_setting('backup_last_run', '')
+        email_enabled = self.get_system_setting('backup_email_enabled', '0') == '1'
         next_backup = None
 
         if enabled:
@@ -1060,13 +1074,15 @@ class DatabaseController:
             'enabled': enabled,
             'backup_time': backup_time,
             'last_run': last_run,
-            'next_backup': next_backup
+            'next_backup': next_backup,
+            'email_enabled': email_enabled
         }
 
-    def set_backup_schedule(self, enabled, backup_time):
+    def set_backup_schedule(self, enabled, backup_time, email_enabled=False):
         """Saves the backup schedule to system_settings."""
         self.update_system_setting('backup_enabled', '1' if enabled else '0')
         self.update_system_setting('backup_time', backup_time)
+        self.update_system_setting('backup_email_enabled', '1' if email_enabled else '0')
 
     def check_and_run_scheduled_backup(self):
         """

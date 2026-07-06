@@ -112,6 +112,78 @@ def send_email(subject, recipient, body, html_body=None):
         traceback.print_exc()
         return False
 
+
+def send_email_with_attachment(subject, recipients, body, filepath, filename=None, html_body=None):
+    """
+    Sends an email with a file attachment to one or more recipients.
+    Uses the existing SMTP settings from the database.
+    `recipients` can be a single email string or a list of emails.
+    """
+    from email.mime.base import MIMEBase
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    settings = db.get_all_system_settings()
+    if not settings.get('smtp_server') or not settings.get('sender_email'):
+        print("[WARN] Email settings not configured. Cannot send attachment.")
+        return False
+
+    try:
+        smtp_port = settings.get('smtp_port')
+        try:
+            port = int(smtp_port) if smtp_port and str(smtp_port).strip() else 587
+        except (ValueError, TypeError):
+            port = 587
+
+        use_ssl = (port == 465)
+        use_tls = (port == 587 or settings.get('smtp_use_tls') == 'True') and not use_ssl
+
+        if isinstance(recipients, str):
+            recipients = [recipients]
+
+        msg = MIMEMultipart('mixed')
+        msg['Subject'] = subject
+        msg['From'] = settings.get('sender_email')
+        msg['To'] = ', '.join(recipients)
+
+        alt = MIMEMultipart('alternative')
+        alt.attach(MIMEText(body, 'plain', 'utf-8'))
+        if html_body:
+            alt.attach(MIMEText(html_body, 'html', 'utf-8'))
+        msg.attach(alt)
+
+        with open(filepath, 'rb') as f:
+            part = MIMEBase('application', 'gzip')
+            part.set_payload(f.read())
+        from email import encoders
+        encoders.encode_base64(part)
+        part.add_header(
+            'Content-Disposition',
+            'attachment',
+            filename=filename or os.path.basename(filepath)
+        )
+        msg.attach(part)
+
+        if use_ssl:
+            with smtplib.SMTP_SSL(settings.get('smtp_server'), port, timeout=15) as server:
+                server.login(settings.get('smtp_username'), settings.get('smtp_password'))
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(settings.get('smtp_server'), port, timeout=15) as server:
+                if use_tls:
+                    server.starttls()
+                if settings.get('smtp_username'):
+                    server.login(settings.get('smtp_username'), settings.get('smtp_password'))
+                server.send_message(msg)
+
+        print(f"[DEBUG] Email with attachment sent to {recipients}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to send email with attachment: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def get_otp_template(otp, user_name="User", purpose="Verification"):
     """
     Returns a professional HTML template for OTP emails.
@@ -163,6 +235,78 @@ def get_otp_template(otp, user_name="User", purpose="Verification"):
             <div class="footer">
                 &copy; 2026 MTracker Systems. All rights reserved.<br>
                 This is an automated security notification.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+def get_backup_email_html(filename, file_size_str, user_name="Admin"):
+    """Returns a professional HTML template for backup notification emails."""
+    bg_color = "#f8fafc"
+    card_bg = "#ffffff"
+    brand_color = "#2563eb"
+    text_color = "#1e293b"
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: {bg_color}; margin: 0; padding: 0; }}
+            .container {{ max-width: 600px; margin: 40px auto; padding: 20px; }}
+            .card {{ background-color: {card_bg}; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }}
+            .header {{ text-align: center; margin-bottom: 30px; }}
+            .logo {{ color: {brand_color}; font-size: 24px; font-weight: bold; text-decoration: none; }}
+            .icon {{ font-size: 48px; margin-bottom: 10px; }}
+            .title {{ font-size: 20px; font-weight: 600; color: {text_color}; margin-bottom: 10px; }}
+            .message {{ color: #64748b; font-size: 16px; line-height: 1.5; margin-bottom: 24px; text-align: center; }}
+            .info-card {{ background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin-bottom: 24px; }}
+            .info-row {{ display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }}
+            .info-row:last-child {{ border-bottom: none; }}
+            .info-label {{ color: #94a3b8; }}
+            .info-value {{ color: {text_color}; font-weight: 600; }}
+            .footer {{ text-align: center; font-size: 12px; color: #94a3b8; margin-top: 20px; }}
+            .warning {{ font-size: 13px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 20px; margin-top: 20px; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="card">
+                <div class="header">
+                    <span class="logo">M<span style="color: #64748b;">Tracker</span></span>
+                </div>
+                <div class="icon" style="text-align: center;">💾</div>
+                <div class="title" style="text-align: center;">Database Backup Created</div>
+                <div class="message">
+                    Hello <b>{user_name}</b>,<br><br>
+                    A new database backup has been created and is attached to this email.
+                </div>
+                <div class="info-card">
+                    <div class="info-row">
+                        <span class="info-label">Filename</span>
+                        <span class="info-value">{filename}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Size</span>
+                        <span class="info-value">{file_size_str}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Date</span>
+                        <span class="info-value">{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
+                    </div>
+                </div>
+                <div class="message" style="font-size: 14px; margin-bottom: 10px;">
+                    Please keep this backup in a secure location. You can also download it from the MTracker admin panel.
+                </div>
+                <div class="warning">
+                    This is an automated backup notification from your MTracker system.<br>
+                    If you did not expect this email, please verify your backup schedule settings.
+                </div>
+            </div>
+            <div class="footer">
+                &copy; 2026 MTracker Systems. All rights reserved.<br>
+                Automated system notification
             </div>
         </div>
     </body>
@@ -1041,6 +1185,57 @@ def admin_delete_backup(filename):
     return jsonify({"status": "error", "message": "Backup not found."}), 404
 
 
+@app.route('/admin/backup/<filename>/email', methods=['POST'])
+@login_required
+def admin_email_backup(filename):
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    import urllib.parse
+    safe_name = urllib.parse.unquote(filename)
+    if '..' in safe_name or '/' in safe_name:
+        return jsonify({"status": "error", "message": "Invalid filename"}), 400
+
+    filepath = os.path.join(db.get_backup_dir(), safe_name)
+    if not os.path.exists(filepath):
+        return jsonify({"status": "error", "message": "Backup not found"}), 404
+
+    # Fetch all admin users with email
+    admins = db.get_admin_users_with_email()
+    if not admins:
+        return jsonify({"status": "error", "message": "No admin users with email configured."}), 400
+
+    recipient_emails = [a['email'] for a in admins if a.get('email')]
+    if not recipient_emails:
+        return jsonify({"status": "error", "message": "No admin users have an email address set."}), 400
+
+    file_size = os.path.getsize(filepath)
+    size_str = f"{file_size / 1024:.1f} KB" if file_size < 1024 * 1024 else f"{file_size / 1024 / 1024:.2f} MB"
+    subject = f"MTracker Database Backup — {safe_name}"
+    body = (
+        f"Hello Admin,\n\n"
+        f"A database backup file has been shared with you.\n\n"
+        f"  File: {safe_name}\n"
+        f"  Size: {size_str}\n\n"
+        f"Please keep this backup in a secure location.\n\n"
+        f"— MTracker System"
+    )
+    html_body = get_backup_email_html(safe_name, size_str, current_user.name)
+
+    success = send_email_with_attachment(
+        subject=subject,
+        recipients=recipient_emails,
+        body=body,
+        filepath=filepath,
+        filename=safe_name,
+        html_body=html_body
+    )
+
+    if success:
+        return jsonify({"status": "success", "message": f"Backup emailed to {len(recipient_emails)} admin(s)."})
+    return jsonify({"status": "error", "message": "Failed to send email. Check SMTP settings."}), 500
+
+
 @app.route('/admin/backup/schedule', methods=['GET'])
 @login_required
 def admin_get_backup_schedule():
@@ -1059,6 +1254,7 @@ def admin_set_backup_schedule():
     data = request.json
     enabled = data.get('enabled', False)
     backup_time = data.get('backup_time', '02:00')
+    email_enabled = data.get('email_enabled', False)
 
     try:
         parts = backup_time.split(':')
@@ -1068,7 +1264,7 @@ def admin_set_backup_schedule():
     except (ValueError, IndexError):
         return jsonify({"status": "error", "message": "Invalid time format. Use HH:MM (24-hour format)."}), 400
 
-    db.set_backup_schedule(enabled, backup_time)
+    db.set_backup_schedule(enabled, backup_time, email_enabled)
     return jsonify({"status": "success", "message": "Backup schedule saved."})
 
 
@@ -1326,7 +1522,34 @@ def _backup_scheduler_worker():
     time.sleep(random.uniform(5, 45))
     while True:
         try:
-            db.check_and_run_scheduled_backup()
+            filename = db.check_and_run_scheduled_backup()
+            if filename:
+                schedule = db.get_backup_schedule()
+                if schedule.get('email_enabled'):
+                    log(f"Email notification enabled — sending backup to admins")
+                    admins = db.get_admin_users_with_email()
+                    recipient_emails = [a['email'] for a in admins if a.get('email')]
+                    if recipient_emails:
+                        import os
+                        filepath = os.path.join(db.get_backup_dir(), filename)
+                        if os.path.exists(filepath):
+                            file_size = os.path.getsize(filepath)
+                            size_str = f"{file_size / 1024:.1f} KB" if file_size < 1024 * 1024 else f"{file_size / 1024 / 1024:.2f} MB"
+                            subject = f"MTracker Database Backup — {filename}"
+                            body = (
+                                f"Hello Admin,\n\n"
+                                f"A scheduled database backup has been created.\n\n"
+                                f"  File: {filename}\n"
+                                f"  Size: {size_str}\n\n"
+                                f"— MTracker System"
+                            )
+                            html_body = get_backup_email_html(filename, size_str, "Admin")
+                            ok = send_email_with_attachment(subject, recipient_emails, body, filepath, filename, html_body=html_body)
+                            log(f"Email {'sent' if ok else 'FAILED'} to {len(recipient_emails)} admin(s)")
+                        else:
+                            log(f"Backup file not found for email: {filepath}")
+                    else:
+                        log("No admin emails found — skipping email")
         except Exception as e:
             log(f"Thread error: {e}")
         time.sleep(60)
