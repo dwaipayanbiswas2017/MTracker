@@ -2,6 +2,7 @@ import csv
 import io
 import secrets
 import time
+import threading
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session, Response
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -963,6 +964,126 @@ def test_mail_settings():
     else:
         return jsonify({"status": "error", "message": "Failed to send test email. Please check your SMTP settings and terminal logs."}), 500
 
+# ─────────────────────────────────────────────────────────
+#  Database Backup & Restore (Admin)
+# ─────────────────────────────────────────────────────────
+
+@app.route('/admin/backup', methods=['POST'])
+@login_required
+def admin_create_backup():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    filename = db.create_backup(user_id=current_user.id)
+    if filename:
+        return jsonify({"status": "success", "filename": filename})
+    return jsonify({"status": "error", "message": "Backup failed. Check server logs."}), 500
+
+
+@app.route('/admin/backups', methods=['GET'])
+@login_required
+def admin_list_backups():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    backups = db.list_backups()
+    return jsonify(backups)
+
+
+@app.route('/admin/backup/<filename>/download', methods=['GET'])
+@login_required
+def admin_download_backup(filename):
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    import urllib.parse
+    safe_name = urllib.parse.unquote(filename)
+    if '..' in safe_name or '/' in safe_name:
+        return jsonify({"status": "error", "message": "Invalid filename"}), 400
+
+    filepath = os.path.join(db.get_backup_dir(), safe_name)
+    if not os.path.exists(filepath):
+        return jsonify({"status": "error", "message": "Backup not found"}), 404
+
+    return send_file(filepath, as_attachment=True, download_name=safe_name)
+
+
+@app.route('/admin/backup/<filename>/restore', methods=['POST'])
+@login_required
+def admin_restore_backup(filename):
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    import urllib.parse
+    safe_name = urllib.parse.unquote(filename)
+    if '..' in safe_name or '/' in safe_name:
+        return jsonify({"status": "error", "message": "Invalid filename"}), 400
+
+    success = db.restore_backup(safe_name, user_id=current_user.id)
+    if success:
+        return jsonify({"status": "success", "message": "Database restored successfully."})
+    return jsonify({"status": "error", "message": "Restore failed. Check server logs."}), 500
+
+
+@app.route('/admin/backup/<filename>/delete', methods=['POST'])
+@login_required
+def admin_delete_backup(filename):
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    import urllib.parse
+    safe_name = urllib.parse.unquote(filename)
+    if '..' in safe_name or '/' in safe_name:
+        return jsonify({"status": "error", "message": "Invalid filename"}), 400
+
+    if db.delete_backup(safe_name):
+        return jsonify({"status": "success", "message": "Backup deleted."})
+    return jsonify({"status": "error", "message": "Backup not found."}), 404
+
+
+@app.route('/admin/backup/schedule', methods=['GET'])
+@login_required
+def admin_get_backup_schedule():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    return jsonify(db.get_backup_schedule())
+
+
+@app.route('/admin/backup/schedule', methods=['POST'])
+@login_required
+def admin_set_backup_schedule():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    data = request.json
+    enabled = data.get('enabled', False)
+    backup_time = data.get('backup_time', '02:00')
+
+    try:
+        parts = backup_time.split(':')
+        h, m = int(parts[0]), int(parts[1])
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            raise ValueError
+    except (ValueError, IndexError):
+        return jsonify({"status": "error", "message": "Invalid time format. Use HH:MM (24-hour format)."}), 400
+
+    db.set_backup_schedule(enabled, backup_time)
+    return jsonify({"status": "success", "message": "Backup schedule saved."})
+
+
+@app.route('/admin/backup/check-schedule', methods=['POST'])
+@login_required
+def admin_check_backup_schedule():
+    if not current_user.is_admin:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+
+    result = db.check_and_run_scheduled_backup()
+    if result:
+        return jsonify({"status": "success", "message": f"Scheduled backup created: {result}", "filename": result})
+    return jsonify({"status": "info", "message": "No backup was due. Check backup schedule settings."})
+
+
 # --- Jinja Filters ---
 
 @app.template_filter('format_currency')
@@ -1184,6 +1305,34 @@ def verify_otp():
         return jsonify({"status": "success", "message": "Verification successful", "type": "password_verification"})
 
     return jsonify({"status": "error", "message": "Invalid OTP"}), 400
+
+# ─────────────────────────────────────────────────────────
+#  Scheduled Backup Worker
+# ─────────────────────────────────────────────────────────
+
+def _backup_scheduler_worker():
+    """Background thread that checks every 60s if a scheduled backup is due."""
+    import random
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs', 'backup_scheduler.log')
+    def log(msg):
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, 'a') as f:
+                f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
+        except Exception:
+            pass
+
+    log("Scheduler thread started")
+    time.sleep(random.uniform(5, 45))
+    while True:
+        try:
+            db.check_and_run_scheduled_backup()
+        except Exception as e:
+            log(f"Thread error: {e}")
+        time.sleep(60)
+
+_backup_thread = threading.Thread(target=_backup_scheduler_worker, daemon=True)
+_backup_thread.start()
 
 if __name__ == '__main__':
     app.run(debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true', host='0.0.0.0')

@@ -2,6 +2,13 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 import json
+import os
+import subprocess
+import gzip
+import shutil
+
+_MYSQLDUMP_PATH = shutil.which('mysqldump') or '/usr/bin/mysqldump'
+_MYSQL_PATH = shutil.which('mysql') or '/usr/bin/mysql'
 
 class DatabaseController:
     """
@@ -869,6 +876,259 @@ class DatabaseController:
             conn.commit()
         finally:
             conn.close()
+
+    # --- Database Backup & Restore ---
+
+    def get_backup_dir(self):
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
+        os.makedirs(backup_dir, exist_ok=True)
+        return backup_dir
+
+    def create_backup(self, user_id=None):
+        """
+        Creates a compressed mysqldump backup.
+        Returns the filename on success, None on failure.
+        """
+        backup_dir = self.get_backup_dir()
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        filename = f"mtracker_backup_{timestamp}.sql.gz"
+        filepath = os.path.join(backup_dir, filename)
+
+        host = self.config.get('host', 'localhost')
+        user = self.config.get('user', 'root')
+        password = self.config.get('password', '')
+        database = self.config.get('database', 'mtracker')
+
+        try:
+            cmd = [
+                _MYSQLDUMP_PATH,
+                f'--host={host}',
+                f'--user={user}',
+                f'--password={password}',
+                '--single-transaction',
+                '--routines',
+                '--triggers',
+                '--force',
+                database
+            ]
+            result = subprocess.run(cmd, check=False, capture_output=True, timeout=300)
+            if result.returncode != 0 and len(result.stdout) == 0:
+                err_msg = result.stderr.decode(errors='replace') if result.stderr else 'unknown error'
+                print(f"[Backup] mysqldump failed: {err_msg}")
+                return None
+            with gzip.open(filepath, 'wb') as f:
+                f.write(result.stdout)
+
+            # --force can return non-zero if views have issues, but data is valid
+            if result.returncode not in (0, 2) and len(result.stdout) == 0:
+                err_msg = result.stderr.decode(errors='replace') if result.stderr else 'unknown error'
+                print(f"[Backup] mysqldump failed: {err_msg}")
+                return None
+
+            self.log_audit(user_id or 'system', 'INSERT', 'backup', filename,
+                           {'action': 'backup_created', 'size': os.path.getsize(filepath)},
+                           origin='web')
+            return filename
+        except subprocess.TimeoutExpired:
+            print(f"[Backup] Timed out during mysqldump")
+            return None
+        except Exception as e:
+            print(f"[Backup] Error: {e}")
+            return None
+
+    def list_backups(self):
+        """Returns a list of backup files sorted newest-first."""
+        backup_dir = self.get_backup_dir()
+        try:
+            files = []
+            for f in os.listdir(backup_dir):
+                if f.startswith('mtracker_backup_') and f.endswith('.sql.gz'):
+                    filepath = os.path.join(backup_dir, f)
+                    stat = os.stat(filepath)
+                    files.append({
+                        'filename': f,
+                        'size': stat.st_size,
+                        'created': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                    })
+            files.sort(key=lambda x: x['created'], reverse=True)
+            return files
+        except Exception as e:
+            print(f"[Backup] Error listing backups: {e}")
+            return []
+
+    def restore_backup(self, filename, user_id=None):
+        """
+        Restores the database from a compressed backup file.
+        WARNING: This will OVERWRITE the current database.
+        Returns True on success.
+        """
+        backup_dir = self.get_backup_dir()
+        filepath = os.path.join(backup_dir, filename)
+
+        if not os.path.exists(filepath):
+            return False
+
+        host = self.config.get('host', 'localhost')
+        user = self.config.get('user', 'root')
+        password = self.config.get('password', '')
+        database = self.config.get('database', 'mtracker')
+
+        try:
+            # Read decompressed content into memory first (gzip.GzipFile stdin
+            # doesn't pipe correctly with subprocess)
+            with gzip.open(filepath, 'rb') as f:
+                sql_content = f.read()
+
+            cmd = [
+                _MYSQL_PATH,
+                f'--host={host}',
+                f'--user={user}',
+                f'--password={password}',
+                '--force',
+                database
+            ]
+            result = subprocess.run(cmd, input=sql_content, capture_output=True, timeout=600)
+            if result.returncode != 0:
+                err = result.stderr.decode(errors='replace') if result.stderr else 'unknown error'
+                self._backup_log(f"Restore failed: {err}")
+                return False
+
+            self.log_audit(user_id or 'system', 'UPDATE', 'backup_restore', filename,
+                           {'action': 'database_restored'}, origin='web')
+            return True
+        except subprocess.TimeoutExpired:
+            self._backup_log("Timed out during restore")
+            return False
+        except Exception as e:
+            self._backup_log(f"Restore error: {e}")
+            return False
+
+    def delete_backup(self, filename):
+        """Deletes a backup file. Returns True on success."""
+        backup_dir = self.get_backup_dir()
+        filepath = os.path.join(backup_dir, filename)
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                return True
+            return False
+        except Exception as e:
+            print(f"[Backup] Delete error: {e}")
+            return False
+
+    @staticmethod
+    def _backup_log(msg):
+        """Write backup log line to logs/backup_scheduler.log."""
+        import os as _os
+        log_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'logs')
+        _os.makedirs(log_dir, exist_ok=True)
+        log_path = _os.path.join(log_dir, 'backup_scheduler.log')
+        try:
+            with open(log_path, 'a') as f:
+                f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
+        except Exception:
+            pass
+
+    def get_backup_schedule(self):
+        """
+        Returns the backup schedule config from system_settings,
+        including the computed next_backup datetime.
+        """
+        enabled = self.get_system_setting('backup_enabled', '0') == '1'
+        backup_time = self.get_system_setting('backup_time', '02:00')
+        last_run = self.get_system_setting('backup_last_run', '')
+        next_backup = None
+
+        if enabled:
+            try:
+                hour, minute = map(int, backup_time.split(':'))
+                now = datetime.now()
+                candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+                # If today's slot has passed or already ran, push to tomorrow
+                if candidate <= now or last_run == now.strftime('%Y-%m-%d'):
+                    from datetime import timedelta
+                    candidate += timedelta(days=1)
+                    # Handle DST transitions: replace again after adding a day
+                    candidate = candidate.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+                next_backup = candidate.strftime('%Y-%m-%d %H:%M:%S')
+            except (ValueError, AttributeError):
+                pass
+
+        return {
+            'enabled': enabled,
+            'backup_time': backup_time,
+            'last_run': last_run,
+            'next_backup': next_backup
+        }
+
+    def set_backup_schedule(self, enabled, backup_time):
+        """Saves the backup schedule to system_settings."""
+        self.update_system_setting('backup_enabled', '1' if enabled else '0')
+        self.update_system_setting('backup_time', backup_time)
+
+    def check_and_run_scheduled_backup(self):
+        """
+        Checks if a scheduled backup is due and runs it.
+        Uses atomic INSERT ... ON DUPLICATE KEY UPDATE to prevent
+        duplicate backups from concurrent workers.
+        Returns filename on success, None if skipped/failed.
+        """
+        schedule = self.get_backup_schedule()
+        if not schedule['enabled']:
+            self._backup_log("Skipped — backup is disabled")
+            return None
+
+        now = datetime.now()
+        today_str = now.strftime('%Y-%m-%d')
+        last_run = schedule.get('last_run', '')
+
+        if last_run == today_str:
+            self._backup_log("Skipped — already ran today")
+            return None
+
+        try:
+            hour, minute = map(int, schedule['backup_time'].split(':'))
+            if now.hour < hour or (now.hour == hour and now.minute < minute):
+                self._backup_log(f"Skipped — not yet time (scheduled {hour:02d}:{minute:02d}, now {now.hour:02d}:{now.minute:02d})")
+                return None
+        except (ValueError, AttributeError) as e:
+            self._backup_log(f"Skipped — bad backup_time '{schedule['backup_time']}': {e}")
+            return None
+
+        # Atomically claim the backup slot
+        conn = self.get_connection()
+        if not conn:
+            self._backup_log("Skipped — no DB connection")
+            return None
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO system_settings (setting_key, setting_value)
+                VALUES ('backup_last_run', %s)
+                ON DUPLICATE KEY UPDATE
+                    setting_value = IF(setting_value != %s, %s, setting_value)
+            """, (today_str, today_str, today_str))
+            affected = cursor.rowcount
+            conn.commit()
+
+            if affected == 0:
+                self._backup_log("Skipped — another worker claimed the slot")
+                return None
+        except Exception as e:
+            self._backup_log(f"Atomic check error: {e}")
+            return None
+        finally:
+            conn.close()
+
+        self._backup_log(f"Starting scheduled backup…")
+        result = self.create_backup(user_id='system')
+        if result:
+            self._backup_log(f"Backup created: {result}")
+        else:
+            self._backup_log("Backup FAILED")
+        return result
 
     # --- Audit Log ---
 

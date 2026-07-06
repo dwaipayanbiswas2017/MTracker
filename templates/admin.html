@@ -392,6 +392,84 @@
             </div>
         </div>
 
+        <!-- Database Backup Section -->
+        <div class="card p-6 border-l-4 border-l-emerald-500">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
+                    <i data-lucide="database-backup"></i>
+                </div>
+                <h3 class="text-lg font-bold">Database Backup</h3>
+            </div>
+
+            <!-- Manual Backup + Schedule Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <!-- Manual Backup -->
+                <div class="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                    <h4 class="font-bold text-sm mb-1">Manual Backup</h4>
+                    <p class="text-xs text-slate-500 mb-3">Create a full database snapshot now</p>
+                    <button id="createBackupBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded shadow active:translate-y-0.5 transition-all text-sm flex items-center justify-center gap-2">
+                        <i data-lucide="play" class="w-4 h-4"></i>
+                        Backup Now
+                    </button>
+                </div>
+
+                <!-- Schedule -->
+                <div class="md:col-span-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                    <h4 class="font-bold text-sm mb-1">Automatic Backup Schedule</h4>
+                    <p class="text-xs text-slate-500 mb-3">Set a daily time for automatic backups</p>
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Time</label>
+                            <input type="time" id="backupTime" value="02:00" class="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded p-2 w-full text-sm outline-none focus:border-emerald-500">
+                        </div>
+                        <div class="flex items-center gap-2 pb-1">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="backupEnabled" class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                                <span class="ml-2 text-xs font-medium text-slate-600 dark:text-slate-400">Enabled</span>
+                            </label>
+                        </div>
+                        <button id="saveScheduleBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded shadow active:translate-y-0.5 transition-all text-sm">
+                            Save Schedule
+                        </button>
+                    </div>
+                    <div id="scheduleStatus" class="mt-2 flex flex-wrap gap-2 items-center text-xs text-slate-500"></div>
+                    <button id="checkScheduleBtn" class="mt-2 bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded shadow active:translate-y-0.5 transition-all text-xs flex items-center gap-1.5">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        Check Schedule Now
+                    </button>
+                </div>
+            </div>
+
+            <!-- Backup Files Table -->
+            <div id="backupListContainer">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-bold text-sm">Backup Files</h4>
+                    <span id="backupCount" class="text-xs text-slate-500"></span>
+                </div>
+                <div class="table-container">
+                    <table id="backupTable">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Size</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="backupTableBody">
+                            <tr id="backupLoadingRow">
+                                <td colspan="4" class="text-center text-slate-500 py-8">
+                                    <i data-lucide="loader-2" class="w-5 h-5 animate-spin inline-block"></i>
+                                    <span class="ml-2">Loading backups...</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Confirmation Modal (Admin) -->
@@ -514,6 +592,79 @@
                     }
                 });
             });
+
+            // ── Backup ──────────────────────────────────
+            loadBackups();
+            loadBackupSchedule();
+
+            // Check schedule now button
+            $('#checkScheduleBtn').click(function() {
+                const btn = $(this);
+                const orig = btn.html();
+                btn.prop('disabled', true).html('<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Checking...');
+                lucide.createIcons();
+                $.ajax({
+                    url: '/admin/backup/check-schedule',
+                    type: 'POST',
+                    success: function(res) {
+                        showToast(res.message);
+                        loadBackups();
+                        loadBackupSchedule();
+                        btn.prop('disabled', false).html(orig);
+                        lucide.createIcons();
+                    },
+                    error: function(xhr) {
+                        showToast(xhr.responseJSON?.message || 'Check failed', true);
+                        btn.prop('disabled', false).html(orig);
+                        lucide.createIcons();
+                    }
+                });
+            });
+
+            // Create backup
+            $('#createBackupBtn').click(function() {
+                const btn = $(this);
+                const orig = btn.html();
+                btn.prop('disabled', true).html('<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Backing up...');
+                lucide.createIcons();
+
+                $.ajax({
+                    url: '/admin/backup',
+                    type: 'POST',
+                    success: function(res) {
+                        showToast('Backup created: ' + res.filename);
+                        loadBackups();
+                        btn.prop('disabled', false).html(orig);
+                        lucide.createIcons();
+                    },
+                    error: function(xhr) {
+                        showToast(xhr.responseJSON?.message || 'Backup failed', true);
+                        btn.prop('disabled', false).html(orig);
+                        lucide.createIcons();
+                    }
+                });
+            });
+
+            // Save schedule
+            $('#saveScheduleBtn').click(function() {
+                const data = {
+                    enabled: $('#backupEnabled').is(':checked'),
+                    backup_time: $('#backupTime').val()
+                };
+                $.ajax({
+                    url: '/admin/backup/schedule',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    success: function(res) {
+                        showToast(res.message);
+                        loadBackupSchedule();
+                    },
+                    error: function(xhr) {
+                        showToast(xhr.responseJSON?.message || 'Failed to save schedule', true);
+                    }
+                });
+            });
         });
 
         function loadMailSettings() {
@@ -527,6 +678,114 @@
                         input.val(data[key]);
                     }
                 }
+            });
+        }
+
+        function loadBackups() {
+            $.get('/admin/backups', function(backups) {
+                const tbody = $('#backupTableBody');
+                $('#backupCount').text(backups.length + ' file(s)');
+                if (backups.length === 0) {
+                    tbody.html('<tr><td colspan="4" class="text-center text-slate-500 py-8"><i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i><br>No backups yet</td></tr>');
+                    lucide.createIcons();
+                    return;
+                }
+                let html = '';
+                backups.forEach(function(b) {
+                    const size = b.size < 1024 ? b.size + ' B'
+                        : b.size < 1024 * 1024 ? (b.size / 1024).toFixed(1) + ' KB'
+                        : (b.size / 1024 / 1024).toFixed(2) + ' MB';
+                    const encoded = encodeURIComponent(b.filename);
+                    html += '<tr class="hover:bg-slate-500/5 transition-colors">'
+                        + '<td><div class="flex items-center gap-2"><i data-lucide="file-archive" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i><span class="font-medium text-xs">' + b.filename + '</span></div></td>'
+                        + '<td class="text-xs text-slate-500">' + size + '</td>'
+                        + '<td class="text-xs text-slate-500">' + b.created + '</td>'
+                        + '<td><div class="flex gap-2">'
+                        + '<a href="/admin/backup/' + encoded + '/download" class="btn-action text-blue-500 bg-blue-500/10 hover:bg-blue-500/20" title="Download"><i data-lucide="download" class="w-4 h-4"></i></a>'
+                        + '<button onclick="restoreBackup(\'' + encoded + '\', \'' + b.filename.replace(/'/g, "\\'") + '\')" class="btn-action text-amber-500 bg-amber-500/10 hover:bg-amber-500/20" title="Restore"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></button>'
+                        + '<button onclick="deleteBackup(\'' + encoded + '\', \'' + b.filename.replace(/'/g, "\\'") + '\')" class="btn-action text-rose-500 bg-rose-500/10 hover:bg-rose-500/20" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>'
+                        + '</div></td></tr>';
+                });
+                tbody.html(html);
+                lucide.createIcons();
+            }).fail(function() {
+                $('#backupTableBody').html('<tr><td colspan="4" class="text-center text-rose-500 py-8">Failed to load backups</td></tr>');
+            });
+        }
+
+        function loadBackupSchedule() {
+            $.get('/admin/backup/schedule', function(sched) {
+                $('#backupEnabled').prop('checked', sched.enabled);
+                $('#backupTime').val(sched.backup_time);
+                let html = '';
+                if (sched.last_run) {
+                    html += '<span class="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded"><b>Last:</b> ' + sched.last_run + '</span>';
+                } else {
+                    html += '<span class="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded"><b>Last:</b> Never</span>';
+                }
+                if (sched.enabled && sched.next_backup) {
+                    html += ' <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded"><b>Next:</b> ' + sched.next_backup + '</span>';
+                } else if (!sched.enabled) {
+                    html += ' <span class="text-amber-500">(Scheduled backup is disabled)</span>';
+                }
+                $('#scheduleStatus').html(html);
+            });
+        }
+
+        function restoreBackup(encoded, name) {
+            $('#confirmTitle').text('RESTORE DATABASE');
+            $('#confirmMessage').html('<div class="text-rose-500 font-bold mb-2">WARNING: This will OVERWRITE the entire database!</div>'
+                + 'Are you sure you want to restore from <strong>' + name + '</strong>?<br>'
+                + '<span class="text-xs text-slate-500">All current data will be replaced with the backup contents.</span>');
+            $('#confirmIconContainer').attr('class', 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-rose-500/10 text-rose-500');
+            $('#confirmIcon').attr('data-lucide', 'alert-triangle');
+            $('#confirmBtn').text('RESTORE DATABASE').attr('class', 'flex-1 bg-rose-600 hover:bg-rose-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-rose-500/20');
+            $('#adminConfirmModal').removeClass('hidden').addClass('flex');
+            lucide.createIcons();
+
+            $('#confirmBtn').off('click').on('click', function() {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Restoring...');
+                $.ajax({
+                    url: '/admin/backup/' + encoded + '/restore',
+                    type: 'POST',
+                    success: function(res) {
+                        showToast(res.message);
+                        closeConfirmModal();
+                    },
+                    error: function(xhr) {
+                        showToast(xhr.responseJSON?.message || 'Restore failed', true);
+                        closeConfirmModal();
+                    }
+                });
+            });
+        }
+
+        function deleteBackup(encoded, name) {
+            $('#confirmTitle').text('Delete Backup');
+            $('#confirmMessage').html('Are you sure you want to delete <strong>' + name + '</strong>?');
+            $('#confirmIconContainer').attr('class', 'w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-rose-500/10 text-rose-500');
+            $('#confirmIcon').attr('data-lucide', 'trash-2');
+            $('#confirmBtn').text('Delete').attr('class', 'flex-1 bg-rose-600 hover:bg-rose-700 py-2 rounded text-white font-bold transition-all shadow-lg shadow-rose-500/20');
+            $('#adminConfirmModal').removeClass('hidden').addClass('flex');
+            lucide.createIcons();
+
+            $('#confirmBtn').off('click').on('click', function() {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Deleting...');
+                $.ajax({
+                    url: '/admin/backup/' + encoded + '/delete',
+                    type: 'POST',
+                    success: function(res) {
+                        showToast(res.message);
+                        loadBackups();
+                        closeConfirmModal();
+                    },
+                    error: function(xhr) {
+                        showToast(xhr.responseJSON?.message || 'Delete failed', true);
+                        closeConfirmModal();
+                    }
+                });
             });
         }
 
@@ -573,14 +832,6 @@
             $('#profile-dropdown-menu').addClass('hidden');
             $('#profile-dropdown-menu-mobile').addClass('hidden');
         });
-
-        function showToast(msg) {
-            $('#toastMsg').text(msg);
-            $('#toast').css('opacity', '1');
-            setTimeout(() => {
-                $('#toast').css('opacity', '0');
-            }, 3000);
-        }
 
         function closeConfirmModal() {
             $('#adminConfirmModal').addClass('hidden').removeClass('flex');
