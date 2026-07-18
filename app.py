@@ -3,6 +3,7 @@ import io
 import secrets
 import time
 import threading
+import logging
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session, Response
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -527,16 +528,22 @@ def chat_page():
 
 @app.route('/api/chat', methods=['POST'])
 @login_required
+@csrf.exempt
 def chat_api():
     data = request.get_json(silent=True) or {}
     message = (data.get('message') or '').strip()
     if not message:
         return jsonify({"error": "Message is required"}), 400
 
+    t0 = time.time()
     try:
         reply = get_response(message, user_id=current_user.id, db=db)
+        elapsed = time.time() - t0
+        app.logger.info(f"Chat OK user={current_user.id} elapsed={elapsed:.1f}s len={len(reply)}")
         return jsonify({"reply": reply})
     except Exception as e:
+        elapsed = time.time() - t0
+        app.logger.error(f"Chat ERROR user={current_user.id} elapsed={elapsed:.1f}s: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 # ─────────────────────────────────────────────────────
@@ -1522,7 +1529,6 @@ def _backup_scheduler_worker():
                     admins = db.get_admin_users_with_email()
                     recipient_emails = [a['email'] for a in admins if a.get('email')]
                     if recipient_emails:
-                        import os
                         filepath = os.path.join(db.get_backup_dir(), filename)
                         if os.path.exists(filepath):
                             file_size = os.path.getsize(filepath)
