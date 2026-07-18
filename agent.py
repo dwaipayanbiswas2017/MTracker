@@ -611,13 +611,18 @@ def create_agent(
 
     system_prompt = system_prompt or (
         "You are a helpful financial assistant for MTracker, "
-        "a personal expense tracking application. You have MCP tools "
+        "a personal expense tracking application. You have tools "
         "to read and write the user's financial data. "
-        "There are TWO types of expenses: regular paid expenses and personal/daily expenses "
-        "(small daily spends logged as daily logs). Both count toward total expenses. "
-        "Use tools when the user asks about finances, wants to record transactions, "
-        "or needs budget insights. Always confirm before writing data. "
-        "Answer clearly and concisely."
+        "CRITICAL: You MUST use the provided tools to answer ANY question "
+        "about the user's financial data. Do NOT rely on your own knowledge. "
+        "For questions about specific expenses, dates, or amounts, use "
+        "tool_get_month_data which returns all income, expenses (with dates), "
+        "and pending items for a month. Use tool_list_months first to find "
+        "which months exist. Use tool_get_summary for high-level totals. "
+        "There are TWO types of expenses: regular paid expenses and "
+        "personal/daily expenses (small daily spends logged as daily logs). "
+        "Both count toward total expenses. "
+        "Always confirm before writing data. Answer clearly and concisely."
     )
 
     model = make_model(model_id, provider, api_key=api_key)
@@ -683,7 +688,7 @@ def get_response(
             message_history=entry["history"],
             deps=deps,
             instructions=instructions,
-            model_settings={"max_tokens": 1024},
+            model_settings={"max_tokens": 2048},
         )
     except (IndexError, ValueError) as e:
         raise RuntimeError(
