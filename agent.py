@@ -523,17 +523,47 @@ async def tool_get_account_balances(ctx: RunContext[AgentDeps], month_key: str) 
     return "\n".join(lines)
 
 
+async def tool_get_last_expense_date(ctx: RunContext[AgentDeps]) -> str:
+    """Find the most recent expense entry across all months. Returns the date, amount, reason, and category of the latest expense."""
+    months = ctx.deps.db.get_months(ctx.deps.user_id)
+    if not months:
+        return "No months found. No expenses recorded yet."
+    months.sort(reverse=True)
+    latest = None
+    latest_month = None
+    for m in months:
+        data = _read_month(ctx, m)
+        if data is None:
+            continue
+        all_expenses = data.get("paidExpenses", []) + data.get("personalExpenses", [])
+        for e in all_expenses:
+            d = e.get("date", "")
+            if d and (latest is None or d > latest):
+                latest = d
+                latest_month = m
+    if latest is None:
+        return "No expenses found in any month."
+    return f"Last expense entry date: {latest} (in month {latest_month})"
+
 async def tool_get_profile(ctx: RunContext[AgentDeps]) -> str:
     """Get user profile settings (name, currency, default account)."""
     user = ctx.deps.db.get_user_by_id(ctx.deps.user_id)
     if not user:
         return "User not found."
+    default_id = user.get('default_account_id')
+    default_name = str(default_id) if default_id else 'Not set'
+    if default_id:
+        accounts = ctx.deps.db.get_accounts(ctx.deps.user_id)
+        for a in accounts:
+            if a['id'] == default_id:
+                default_name = a['account_name']
+                break
     return (
         f"Name: {user.get('name')}\n"
         f"Email: {user.get('email') or 'Not set'}\n"
         f"Phone: {user.get('phone') or 'Not set'}\n"
         f"Currency: {user.get('currency_pref', 'INR')}\n"
-        f"Default Account ID: {user.get('default_account_id')}"
+        f"Default Account: {default_name}"
     )
 
 
@@ -558,6 +588,7 @@ AGENT_TOOLS = [
     tool_get_summary,
     tool_get_month_data,
     tool_get_account_balances,
+    tool_get_last_expense_date,
     tool_add_paid_expense,
     tool_add_income,
     tool_add_pending_item,
@@ -619,6 +650,7 @@ def create_agent(
         "tool_get_month_data which returns all income, expenses (with dates), "
         "and pending items for a month. Use tool_list_months first to find "
         "which months exist. Use tool_get_summary for high-level totals. "
+        "Use tool_get_last_expense_date to find the most recent expense entry. "
         "There are TWO types of expenses: regular paid expenses and "
         "personal/daily expenses (small daily spends logged as daily logs). "
         "Both count toward total expenses. "
