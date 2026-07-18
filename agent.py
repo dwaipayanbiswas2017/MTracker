@@ -92,16 +92,21 @@ DEFAULT_MODELS = {
     "deepseek":    "deepseek-chat",
     "xai":         "grok-4",
     "openrouter":  "openai/gpt-4o",
-    "nvidia":      "google/diffusiongemma-26b-a4b-it",
+    "nvidia":      "meta/llama-3.1-8b-instruct",
 }
 
 
 NVIDIA_MODELS = {
-    "google/diffusiongemma-26b-a4b-it": "DiffusionGemma 26B",
-    "qwen/qwen3.5-122b-a10b":           "Qwen 3.5 122B (10B active)",
+    "meta/llama-3.1-8b-instruct":            "Llama 3.1 8B (fast)",
+    "meta/llama-3.3-70b-instruct":           "Llama 3.3 70B",
+    "qwen/qwen3.5-122b-a10b":                "Qwen 3.5 122B (10B active)",
+    "mistralai/mistral-7b-instruct-v0.3":    "Mistral 7B",
+    "mistralai/mistral-large-2-instruct":    "Mistral Large 2",
+    "google/gemma-2-2b-it":                  "Gemma 2 2B (fast)",
+    "microsoft/phi-3.5-moe-instruct":        "Phi-3.5 MoE",
 }
 
-NVIDIA_DEFAULT_MODEL = "google/diffusiongemma-26b-a4b-it"
+NVIDIA_DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"
 
 
 # ─────────────────────────────────────────────────────────
