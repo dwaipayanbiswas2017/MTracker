@@ -525,24 +525,16 @@ def index():
 def chat_page():
     return render_template('chat.html', name=current_user.name, user=current_user)
 
-@app.route('/api/models')
-@login_required
-def list_models():
-    from agent import NVIDIA_MODELS, NVIDIA_DEFAULT_MODEL
-    items = [{"id": k, "label": v} for k, v in NVIDIA_MODELS.items()]
-    return jsonify({"models": items, "default": NVIDIA_DEFAULT_MODEL})
-
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def chat_api():
     data = request.get_json(silent=True) or {}
     message = (data.get('message') or '').strip()
-    model_id = (data.get('model') or '').strip() or None
     if not message:
         return jsonify({"error": "Message is required"}), 400
 
     try:
-        reply = get_response(message, user_id=current_user.id, db=db, model_id=model_id)
+        reply = get_response(message, user_id=current_user.id, db=db)
         return jsonify({"reply": reply})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

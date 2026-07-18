@@ -3,22 +3,17 @@ MTracker AI Agent — Built with Pydantic AI.
 
 CLI usage:
     python agent.py
-    python agent.py --provider openai --model gpt-4o
-    python agent.py --provider nvidia --model google/diffusiongemma-26b-a4b-it
 
 Programmatic usage (from Flask):
     from agent import get_response
     reply = get_response("Hello", user_id="...", db=db_obj)
 
 API keys are read from environment variables:
-  OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, GROQ_API_KEY,
-  DEEPSEEK_API_KEY, XAI_API_KEY, OPENROUTER_API_KEY, NVIDIA_API_KEY
+  NVIDIA_API_KEY
 """
 
-import argparse
 import json
 import os
-import sys
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -32,6 +27,9 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 load_dotenv()
+
+
+MODEL_ID = "google/diffusiongemma-26b-a4b-it"
 
 
 # ─────────────────────────────────────────────────────────
@@ -48,60 +46,17 @@ class AgentDeps:
 
 
 # ─────────────────────────────────────────────────────────
-#  Provider helpers
+#  Model
 # ─────────────────────────────────────────────────────────
 
-def make_model(model_id: str, provider_name: str, api_key: str | None = None):
-    """Return a pydantic-ai Model for the given provider."""
-    GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-    NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY")
-
-    custom_endpoints = {
-        "google":    ("https://generativelanguage.googleapis.com/v1beta/openai/", "GOOGLE_API_KEY"),
-        "openrouter":("https://openrouter.ai/api/v1",                           "OPENROUTER_API_KEY"),
-        "nvidia":    ("https://integrate.api.nvidia.com/v1",                    "NVIDIA_API_KEY"),
-        "xai":       ("https://api.x.ai/v1",                                    "XAI_API_KEY"),
-    }
-
-    if provider_name in custom_endpoints:
-        base_url, env_key = custom_endpoints[provider_name]
-        key = api_key or os.environ.get(env_key)
-        if not key:
-            raise ValueError(f"{env_key} is not set. Please set it in your .env file or environment.")
-
-        http_client = httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=30.0))
-        provider = OpenAIProvider(base_url=base_url, api_key=key, http_client=http_client)
-        return OpenAIChatModel(model_id, provider=provider)
-
-    return f"{provider_name}:{model_id}"
-
-
-def _require_env(key: str) -> str:
-    val = os.environ.get(key)
-    if not val:
-        print(f"Error: {key} is not set.", file=sys.stderr)
-        sys.exit(1)
-    return val
-
-
-DEFAULT_MODELS = {
-    "openai":      "gpt-4o",
-    "anthropic":   "claude-sonnet-4-0",
-    "google":      "gemini-2.0-flash",
-    "groq":        "llama-3.3-70b-versatile",
-    "deepseek":    "deepseek-chat",
-    "xai":         "grok-4",
-    "openrouter":  "openai/gpt-4o",
-    "nvidia":      "meta/llama-3.1-8b-instruct",
-}
-
-
-NVIDIA_MODELS = {
-    "google/diffusiongemma-26b-a4b-it": "DiffusionGemma 26B",
-    "qwen/qwen3.5-122b-a10b":           "Qwen 3.5 122B (10B active)",
-}
-
-NVIDIA_DEFAULT_MODEL = "google/diffusiongemma-26b-a4b-it"
+def _make_model():
+    """Return the pydantic-ai Model for NVIDIA DiffusionGemma."""
+    key = os.environ.get("NVIDIA_API_KEY")
+    if not key:
+        raise ValueError("NVIDIA_API_KEY is not set. Please set it in your .env file or environment.")
+    http_client = httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=30.0))
+    provider = OpenAIProvider(base_url="https://integrate.api.nvidia.com/v1", api_key=key, http_client=http_client)
+    return OpenAIChatModel(MODEL_ID, provider=provider)
 
 
 # ─────────────────────────────────────────────────────────
@@ -631,18 +586,11 @@ def _is_system_msg(msg) -> bool:
     )
 
 
-def create_agent(
-    provider: str = "nvidia",
-    model_id: str | None = None,
-    api_key: str | None = None,
-    system_prompt: str | None = None,
-):
-    """Create (or return a cached) Pydantic AI agent per model with MCP tools."""
+def create_agent(system_prompt: str | None = None):
+    """Create (or return a cached) Pydantic AI agent with MCP tools."""
     global _agent_cache
-    model_id = model_id or NVIDIA_DEFAULT_MODEL
-    key = f"{provider}:{model_id}"
-    if key in _agent_cache:
-        return _agent_cache[key]
+    if "default" in _agent_cache:
+        return _agent_cache["default"]
 
     system_prompt = system_prompt or (
         "You are a helpful financial assistant for MTracker, "
@@ -661,18 +609,18 @@ def create_agent(
         "Always confirm before writing data. Answer clearly and concisely."
     )
 
-    model = make_model(model_id, provider, api_key=api_key)
+    model = _make_model()
     agent = Agent(
         model=model,
         system_prompt=system_prompt,
         deps_type=AgentDeps,
         tools=AGENT_TOOLS,
     )
-    _agent_cache[key] = {
+    _agent_cache["default"] = {
         "agent": agent,
         "history": [],
     }
-    return _agent_cache[key]
+    return _agent_cache["default"]
 
 
 def get_response(
@@ -680,20 +628,15 @@ def get_response(
     *,
     user_id: str,
     db: Any,
-    model_id: str | None = None,
-    provider: str = "nvidia",
-    api_key: str | None = None,
 ) -> str:
     """Send a message to the agent and return its text reply.
 
     Automatically loads user profile for currency, name, and default account.
     Injects today's date and user's currency as per-call instructions
     (so cached agents always have fresh context).
-    Conversation history is maintained per model.
+    Conversation history is maintained.
     """
     global _agent_cache
-    model_id = model_id or NVIDIA_DEFAULT_MODEL
-    key = f"{provider}:{model_id}"
 
     # Load user profile for dynamic context
     user = db.get_user_by_id(user_id) if db else None
@@ -703,10 +646,10 @@ def get_response(
     today = datetime.now().strftime("%Y-%m-%d")
     current_month = datetime.now().strftime("%Y-%m")
 
-    if key not in _agent_cache:
-        create_agent(provider=provider, model_id=model_id, api_key=api_key)
+    if "default" not in _agent_cache:
+        create_agent()
 
-    entry = _agent_cache[key]
+    entry = _agent_cache["default"]
     agent = entry["agent"]
     deps = AgentDeps(user_id=user_id, db=db, user_name=user_name, currency=currency)
 
@@ -728,43 +671,26 @@ def get_response(
         )
     except (IndexError, ValueError) as e:
         raise RuntimeError(
-            f"Model '{model_id}' returned an unexpected response "
-            f"({type(e).__name__}: {e}). Try a different model."
+            f"Model returned an unexpected response "
+            f"({type(e).__name__}: {e})."
         ) from e
 
     entry["history"] = [m for m in result.all_messages() if not _is_system_msg(m)]
     return result.output
 
 
-def reset_agent(model_id: str | None = None):
-    """Drop cached agent(s)."""
+def reset_agent():
+    """Drop the cached agent."""
     global _agent_cache
-    if model_id:
-        key = f"nvidia:{model_id}"
-        _agent_cache.pop(key, None)
-    else:
-        _agent_cache.clear()
+    _agent_cache.clear()
 
 
 # ─────────────────────────────────────────────────────────
 #  CLI
 # ─────────────────────────────────────────────────────────
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="MTracker AI Agent (Pydantic AI)")
-    p.add_argument("--provider", default="openai", choices=list(DEFAULT_MODELS), help="LLM provider")
-    p.add_argument("--model", default=None, help="Model identifier")
-    p.add_argument("--system-prompt", default="You are a helpful financial assistant for MTracker...", help="System prompt")
-    p.add_argument("--api-key", default=None, help="API key override")
-    return p
-
-
 def main() -> None:
-    args = build_parser().parse_args()
-    model_id = args.model or DEFAULT_MODELS[args.provider]
-    agent = create_agent(provider=args.provider, model_id=model_id, api_key=args.api_key, system_prompt=args.system_prompt)
-
-    print(f"\n MTracker Agent  |  provider: {args.provider}  |  model: {model_id}")
+    print(f"\n MTracker Agent  |  model: {MODEL_ID}")
     print("─" * 50)
     print("Type 'quit' or 'exit' to stop.\n")
 
@@ -776,13 +702,7 @@ def main() -> None:
         if not user_input: continue
         if user_input.lower() in ("quit", "exit"): break
 
-        reply = get_response(
-            user_input,
-            user_id="cli",
-            db=None,
-            model_id=model_id,
-            provider=args.provider,
-        )
+        reply = get_response(user_input, user_id="cli", db=None)
         print(f"Agent > {reply}\n")
 
 

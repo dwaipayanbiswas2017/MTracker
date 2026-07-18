@@ -193,9 +193,7 @@
             <div class="avatar"><i data-lucide="bot"></i></div>
             <div>
                 <h2>AI Assistant</h2>
-                <select id="cwModelSelect" class="text-[9px] text-slate-400 bg-transparent border-0 p-0 m-0 outline-none cursor-pointer hover:text-blue-500 transition-colors max-w-[160px] truncate appearance-none" style="background: none;">
-                    <option value="">Loading...</option>
-                </select>
+                <span class="text-[9px] text-slate-400">DiffusionGemma 26B</span>
             </div>
         </div>
         <div class="cw-header-actions">
@@ -230,33 +228,7 @@
     const cwPanel = document.getElementById('cwPanel');
     const cwOverlay = document.getElementById('cwOverlay');
     const cwBtn = document.getElementById('cwBtn');
-    const cwModelSelect = document.getElementById('cwModelSelect');
-
-    let cwModel = localStorage.getItem('chat_model') || null;
-
-    // Load models
-    (async function() {
-        try {
-            const res = await fetch('/api/models');
-            const data = await res.json();
-            cwModelSelect.innerHTML = '';
-            const saved = localStorage.getItem('chat_model');
-            data.models.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.id;
-                opt.textContent = m.label;
-                if (m.id === saved || (!saved && m.id === data.default)) opt.selected = true;
-                cwModelSelect.appendChild(opt);
-            });
-            if (!saved) cwModel = data.default;
-            else cwModel = saved;
-        } catch { cwModelSelect.innerHTML = '<option>NVIDIA</option>'; }
-    })();
-
-    cwModelSelect.addEventListener('change', function() {
-        cwModel = this.value;
-        localStorage.setItem('chat_model', cwModel);
-    });
+    const cwModel = null;
 
     function cwToggle() {
         cwPanel.classList.toggle('open');
@@ -293,7 +265,7 @@
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ message: msg, model: cwModel })
+                body: JSON.stringify({ message: msg })
             });
             const data = await res.json();
             cwTyping.classList.remove('show');
