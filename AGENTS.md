@@ -2,8 +2,8 @@
 
 ## Run commands
 - Dev: `python app.py` (0.0.0.0:5000)
-- Production: `systemctl --user restart mtracker.service` (Gunicorn via systemd user service)
-  - 3 workers, 120s timeout (see `/home/dwaipayan/.config/systemd/user/mtracker.service`)
+- Production: `systemctl --user restart mtracker.service` (Gunicorn via systemd user service, port 80)
+  - 3 workers, 300s timeout (see `/home/dwaipayan/.config/systemd/user/mtracker.service`)
 - Logs: `tail -f /home/dwaipayan/MTracker/logs/access.log` and `tail -f /home/dwaipayan/MTracker/logs/error.log`
 
 ## Stack

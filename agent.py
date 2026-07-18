@@ -69,7 +69,7 @@ def make_model(model_id: str, provider_name: str, api_key: str | None = None):
         if not key:
             raise ValueError(f"{env_key} is not set. Please set it in your .env file or environment.")
 
-        http_client = httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0))
+        http_client = httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=30.0))
         provider = OpenAIProvider(base_url=base_url, api_key=key, http_client=http_client)
         return OpenAIChatModel(model_id, provider=provider)
 
@@ -97,16 +97,11 @@ DEFAULT_MODELS = {
 
 
 NVIDIA_MODELS = {
-    "meta/llama-3.1-8b-instruct":            "Llama 3.1 8B (fast)",
-    "meta/llama-3.3-70b-instruct":           "Llama 3.3 70B",
-    "qwen/qwen3.5-122b-a10b":                "Qwen 3.5 122B (10B active)",
-    "mistralai/mistral-7b-instruct-v0.3":    "Mistral 7B",
-    "mistralai/mistral-large-2-instruct":    "Mistral Large 2",
-    "google/gemma-2-2b-it":                  "Gemma 2 2B (fast)",
-    "microsoft/phi-3.5-moe-instruct":        "Phi-3.5 MoE",
+    "google/diffusiongemma-26b-a4b-it": "DiffusionGemma 26B",
+    "qwen/qwen3.5-122b-a10b":           "Qwen 3.5 122B (10B active)",
 }
 
-NVIDIA_DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"
+NVIDIA_DEFAULT_MODEL = "google/diffusiongemma-26b-a4b-it"
 
 
 # ─────────────────────────────────────────────────────────
@@ -567,12 +562,21 @@ async def tool_get_profile(ctx: RunContext[AgentDeps]) -> str:
     )
 
 
-async def tool_update_profile(ctx: RunContext[AgentDeps], name: str = None, currency_pref: str = None, default_account_id: int = None) -> str:
-    """Update user profile preferences (name, currency, default account)."""
+async def tool_update_profile(ctx: RunContext[AgentDeps], name: str = None, currency_pref: str = None, default_account: str = None) -> str:
+    """Update user profile preferences (name, currency, default account). Provide default_account as the account NAME (e.g. 'Cash', 'SBI-2390')."""
     kwargs = {}
     if name is not None: kwargs["name"] = name
     if currency_pref is not None: kwargs["currency_pref"] = currency_pref
-    if default_account_id is not None: kwargs["default_account_id"] = default_account_id
+    if default_account is not None:
+        accounts = ctx.deps.db.get_accounts(ctx.deps.user_id)
+        account_id = None
+        for a in accounts:
+            if a['account_name'] == default_account:
+                account_id = a['id']
+                break
+        if account_id is None:
+            return f"Account '{default_account}' not found. Available accounts: {', '.join(a['account_name'] for a in accounts)}"
+        kwargs["default_account_id"] = account_id
     if not kwargs:
         return "No changes requested."
     if ctx.deps.db.update_user(ctx.deps.user_id, **kwargs):
