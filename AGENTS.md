@@ -2,9 +2,12 @@
 
 ## Run commands
 - Dev: `python app.py` (0.0.0.0:5000)
-- Production: `systemctl --user restart mtracker.service` (Gunicorn via systemd user service, port 80)
-  - 3 workers, 300s timeout (see `/home/dwaipayan/.config/systemd/user/mtracker.service`)
-- Logs: `tail -f /home/dwaipayan/MTracker/logs/access.log` and `tail -f /home/dwaipayan/MTracker/logs/error.log`
+- Production: `systemctl --user restart mtracker.service` — runs the app in Docker via `docker compose up` (host networking, port 80)
+  - Image rebuilt with `sudo docker compose build` (`Dockerfile` + `docker-compose.yml` in repo root)
+  - Docker daemon access via passwordless `sudo` (service ExecStart uses `sudo -n docker compose up`)
+  - MySQL stays on the host (`host=127.0.0.1` via host networking); DB grants unchanged
+- Logs: `sudo docker compose logs -f mtracker`
+- Containers: `sudo docker ps`; stop/start stack: `sudo docker compose down/up`
 
 ## Stack
 Python Flask (single `app.py` + `database_controller.py`), MySQL, jQuery inline in `templates/index.html`, Tailwind CSS (CDN), Chart.js, html2pdf, Lucide icons.

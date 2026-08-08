@@ -1,0 +1,17 @@
+services:
+  mtracker:
+    build: .
+    image: mtracker_image
+    container_name: mtracker
+    network_mode: host
+    environment:
+      # Host networking → 127.0.0.1 hits the host's MySQL (overrides Dockerfile's ENV host)
+      host: 127.0.0.1
+    volumes:
+      - mtracker_uploads:/app/static/uploads/profile_pics
+      - mtracker_backups:/app/backups
+    restart: unless-stopped
+
+volumes:
+  mtracker_uploads:
+  mtracker_backups:
