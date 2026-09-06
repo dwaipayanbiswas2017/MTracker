@@ -1,17 +1,23 @@
 """
 MTracker AI Agent — Built with Pydantic AI.
 
+The agent has NO tool implementations of its own. All 16 tools are defined
+once, in ``mcp_server.py``. This module discovers them from the MCP server
+registry, builds typed pydantic-ai ``Tool`` proxies for each one, and routes
+every call through ``MTrackerMCPServer.call_tool(...)`` (in-process MCP).
+
 CLI usage:
     python agent.py
 
 Programmatic usage (from Flask):
     from agent import get_response
-    reply = get_response("Hello", user_id="...", db=db_obj)
+    reply = get_response("Hello", user_id="...", mcp_server=mcp_server)
 
 API keys are read from environment variables:
   NVIDIA_API_KEY
 """
 
+import inspect
 import json
 import os
 from dataclasses import dataclass
@@ -25,11 +31,16 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ModelRequest, SystemPromptPart
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.tools import Tool
 
 load_dotenv()
 
 
 MODEL_ID = "google/diffusiongemma-26b-a4b-it"
+
+# The in-process agent always operates with full permissions for its user.
+# Read-only enforcement applies only to over-the-wire PAT tokens.
+_AGENT_SCOPE = "read_write"
 
 
 # ─────────────────────────────────────────────────────────
@@ -39,8 +50,9 @@ MODEL_ID = "google/diffusiongemma-26b-a4b-it"
 @dataclass
 class AgentDeps:
     """Runtime dependencies passed to every agent tool call."""
+
     user_id: str
-    db: Any  # DatabaseController instance
+    mcp_server: Any  # MTrackerMCPServer instance
     user_name: str = "User"
     currency: str = "INR"
 
@@ -60,518 +72,141 @@ def _make_model():
 
 
 # ─────────────────────────────────────────────────────────
-#  MCP Tool helpers
+#  Dynamic tool proxy builder
+#
+#  Each MCP tool's JSON Schema is turned into a real, typed Python function
+#  signature so pydantic-ai generates an accurate schema for the LLM
+#  (correct types, parameter descriptions, optional/default handling).
 # ─────────────────────────────────────────────────────────
 
-def _read_month(ctx: RunContext[AgentDeps], month_key: str) -> dict | None:
-    """Read month data, returning None if not found."""
-    data = ctx.deps.db.get_month_data(ctx.deps.user_id, month_key)
-    if data is None:
-        return None
-    data.setdefault("income", [])
-    data.setdefault("paidExpenses", [])
-    data.setdefault("personalExpenses", [])
-    data.setdefault("pendingExpenses", [])
-    data.setdefault("notes", [])
-    if not isinstance(data.get("openingBalance"), dict):
-        data["openingBalance"] = {}
-    return data
+_TYPE_MAP = {
+    "string": "str",
+    "number": "float",
+    "integer": "int",
+    "boolean": "bool",
+    "array": "list",
+}
 
 
-def _save_month(ctx: RunContext[AgentDeps], month_key: str, data: dict) -> bool:
-    return ctx.deps.db.save_month_data(ctx.deps.user_id, month_key, data)
+def _make_tool_proxy(name: str, input_schema: dict):
+    """Build an async function that forwards to the MCP server in-process.
 
+    The returned function has a typed ``__signature__`` and ``__annotations__``
+    derived from the tool's JSON Schema, so pydantic-ai can generate a proper
+    JSON schema for the model.
+    """
+    props = input_schema.get("properties", {}) or {}
+    required = set(input_schema.get("required", []) or [])
 
-def _audit(ctx: RunContext[AgentDeps], action: str, table: str, record_id: str, details: dict = None):
-    try:
-        ctx.deps.db.log_audit(ctx.deps.user_id, action, table, record_id, details, origin="agent")
-    except Exception:
-        pass
-
-
-# ─────────────────────────────────────────────────────────
-#  MCP Tool Definitions
-# ─────────────────────────────────────────────────────────
-
-async def tool_get_summary(ctx: RunContext[AgentDeps], month_key: str) -> str:
-    """Get a high-level financial summary for a month including income, paid expenses, personal/daily expenses, per-account opening balances, and net balance. Personal expenses (daily log entries like pocket cash, minor spends) are included in total expenses. Use YYYY-MM format for month_key."""
-    data = _read_month(ctx, month_key)
-    if data is None:
-        return f"Month {month_key} not found. Use create_month first."
-    total_income = sum(float(i["amount"]) for i in data["income"])
-    total_paid = sum(float(e["amount"]) for e in data["paidExpenses"])
-    total_personal = sum(float(e["amount"]) for e in data["personalExpenses"])
-    ob = data.get("openingBalance", {})
-    total_opening = sum(float(v) for v in ob.values()) if isinstance(ob, dict) else float(ob or 0)
-    total_expenses = total_paid + total_personal
-    currency = ctx.deps.currency
-
-    # Per-account opening balance
-    ob_lines = "\n".join(f"    {acc}: {amt} {currency}" for acc, amt in ob.items()) if ob else "    (none)"
-
-    return (
-        f"Summary for {month_key} ({currency}):\n"
-        f"  Opening Balance by Account:\n{ob_lines}\n"
-        f"  Total Opening: {total_opening} {currency}\n"
-        f"  Income: {total_income} {currency}\n"
-        f"  Paid Expenses: {total_paid} {currency} ({len(data['paidExpenses'])} txns)\n"
-        f"  Personal/Daily Expenses: {total_personal} {currency} ({len(data['personalExpenses'])} txns)\n"
-        f"  Total Expenses: {total_expenses} {currency}\n"
-        f"  Net Balance: {total_opening + total_income - total_expenses} {currency}\n"
-        f"  Pending Items: {len(data['pendingExpenses'])}\n"
-        f"  Notes: {len(data['notes'])}"
+    # Namespace for the dynamically-compiled function. It must be able to
+    # resolve every annotation referenced in the generated code.
+    ns: dict = {}
+    exec(
+        "from typing import Optional, Annotated, Literal\n"
+        "from pydantic import Field\n"
+        "import json",
+        ns,
     )
 
+    annotations: dict[str, Any] = {}
+    param_defs: list[inspect.Parameter] = []
+    arg_names: list[str] = []
 
-async def tool_get_month_data(ctx: RunContext[AgentDeps], month_key: str) -> str:
-    """Get the full state of a month including all income, paid expenses, personal/daily expenses, pending items, notes, and per-account opening balances."""
-    data = ctx.deps.db.get_month_data(ctx.deps.user_id, month_key)
-    if data is None:
-        return f"Month {month_key} not found."
-    return json.dumps(data, default=str, indent=2)
+    # Required params first: Python forbids non-default arguments after defaults,
+    # and schemas may list an optional property before a required one.
+    ordered = sorted(props.items(), key=lambda kv: kv[0] not in required)
+    for pname, pmeta in ordered:
+        # String enums become Literal[...] so the model sees the allowed values.
+        enum_vals = pmeta.get("enum") if isinstance(pmeta, dict) else None
+        if isinstance(enum_vals, list) and enum_vals and all(isinstance(v, str) for v in enum_vals):
+            type_expr = "Literal[" + ", ".join(repr(v) for v in enum_vals) + "]"
+        else:
+            type_expr = _TYPE_MAP.get(str(pmeta.get("type", "string")), "str")
+        desc = pmeta.get("description", "")
+        if pname in required:
+            ann_expr = f"Annotated[{type_expr}, Field(description={desc!r})]"
+            default = inspect.Parameter.empty
+        else:
+            ann_expr = f"Annotated[Optional[{type_expr}], Field(default=None, description={desc!r})]"
+            default = None
+        exec(f"ann = {ann_expr}", ns)
+        ann = ns["ann"]
+        annotations[pname] = ann
+        param_defs.append(
+            inspect.Parameter(
+                pname,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=default,
+                annotation=ann,
+            )
+        )
+        arg_names.append(pname)
 
+    sig = inspect.Signature(
+        [inspect.Parameter("ctx", inspect.Parameter.POSITIONAL_OR_KEYWORD), *param_defs]
+    )
+    annotations["return"] = "str"
 
-async def tool_add_paid_expense(ctx: RunContext[AgentDeps], month_key: str, amount: float, reason: str, category: str, account: str, date: str = None) -> str:
-    """Record a completed regular (non-daily) expense transaction. For personal/daily small spends, use a different approach. amount, reason, category, and account are required. Date defaults to today."""
-    data = _read_month(ctx, month_key)
-    if data is None:
-        return f"Month {month_key} not found. Use create_month first."
-    cats = ctx.deps.db.get_categories(ctx.deps.user_id)
-    if category not in cats:
-        return f"Category '{category}' not found. Available: {', '.join(cats)}"
-    accs = ctx.deps.db.get_accounts(ctx.deps.user_id)
-    acc_names = [a["account_name"] for a in accs]
-    if account not in acc_names:
-        return f"Account '{account}' not found."
-    item = {
-        "id": str(datetime.now().timestamp()),
-        "reason": reason,
-        "category": category,
-        "account": account,
-        "amount": float(amount),
-        "date": date or datetime.now().strftime("%Y-%m-%d"),
-        "notes": None,
-    }
-    data["paidExpenses"].append(item)
-    if _save_month(ctx, month_key, data):
-        _audit(ctx, "INSERT", "paid_expenses", item["id"], {"month_key": month_key, "reason": reason, "amount": amount})
-        return f"Expense '{reason}' ({amount}) recorded in {month_key}."
-    return "Failed to save expense."
-
-
-async def tool_add_income(ctx: RunContext[AgentDeps], month_key: str, amount: float, source: str, account: str) -> str:
-    """Record a new income entry. amount, source, and account are required."""
-    data = _read_month(ctx, month_key)
-    if data is None:
-        return f"Month {month_key} not found. Use create_month first."
-    accs = ctx.deps.db.get_accounts(ctx.deps.user_id)
-    acc_names = [a["account_name"] for a in accs]
-    if account not in acc_names:
-        return f"Account '{account}' not found."
-    item = {
-        "id": str(datetime.now().timestamp()),
-        "source": source,
-        "account": account,
-        "amount": float(amount),
-        "notes": None,
-    }
-    data["income"].append(item)
-    if _save_month(ctx, month_key, data):
-        _audit(ctx, "INSERT", "income", item["id"], {"month_key": month_key, "source": source, "amount": amount})
-        return f"Income '{source}' ({amount}) recorded in {month_key}."
-    return "Failed to save income."
-
-
-async def tool_add_pending_item(ctx: RunContext[AgentDeps], month_key: str, amount: float, reason: str, category: str) -> str:
-    """Add a planned/pending budget item to a month. amount, reason, and category are required."""
-    data = _read_month(ctx, month_key)
-    if data is None:
-        return f"Month {month_key} not found. Use create_month first."
-    cats = ctx.deps.db.get_categories(ctx.deps.user_id)
-    if category not in cats:
-        return f"Category '{category}' not found. Available: {', '.join(cats)}"
-    item = {
-        "id": str(datetime.now().timestamp()),
-        "reason": reason,
-        "category": category,
-        "amount": float(amount),
-        "mode": "online",
-    }
-    data["pendingExpenses"].append(item)
-    if _save_month(ctx, month_key, data):
-        _audit(ctx, "INSERT", "pending_expenses", item["id"], {"month_key": month_key, "reason": reason, "amount": amount})
-        return f"Pending item '{reason}' ({amount}) added to {month_key}."
-    return "Failed to save pending item."
-
-
-async def tool_transfer_funds(ctx: RunContext[AgentDeps], month_key: str, from_account: str, to_account: str, amount: float, reason: str = None) -> str:
-    """Move money between accounts. Creates a linked expense (from) and income (to) pair. from_account, to_account, and amount are required."""
-    data = _read_month(ctx, month_key)
-    if data is None:
-        return f"Month {month_key} not found."
-    accs = ctx.deps.db.get_accounts(ctx.deps.user_id)
-    acc_names = [a["account_name"] for a in accs]
-    if from_account not in acc_names:
-        return f"Source account '{from_account}' not found."
-    if to_account not in acc_names:
-        return f"Destination account '{to_account}' not found."
-    if from_account == to_account:
-        return "Source and destination accounts must differ."
-    cats = ctx.deps.db.get_categories(ctx.deps.user_id)
-    if "Transfer" not in cats:
-        ctx.deps.db.add_category(ctx.deps.user_id, "Transfer")
-    reason = reason or "Fund Transfer"
-    ref = str(datetime.now().timestamp())
-    expense = {
-        "id": str(datetime.now().timestamp() + 1),
-        "reason": f"{reason} (to {to_account})",
-        "category": "Transfer",
-        "account": from_account,
-        "amount": float(amount),
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "notes": f"__transfer__:{ref}",
-    }
-    income = {
-        "id": str(datetime.now().timestamp() + 2),
-        "source": f"{reason} (from {from_account})",
-        "account": to_account,
-        "amount": float(amount),
-        "notes": f"__transfer__:{ref}",
-    }
-    data["paidExpenses"].append(expense)
-    data["income"].append(income)
-    if _save_month(ctx, month_key, data):
-        return f"Transferred {amount} from {from_account} to {to_account}."
-    return "Failed to process transfer."
-
-
-async def tool_delete_expense(ctx: RunContext[AgentDeps], month_key: str, expense_id: str) -> str:
-    """Delete an expense from a month. Reverses linked debt payments and removes linked transfer entries."""
-    if ctx.deps.db.delete_expense(ctx.deps.user_id, month_key, expense_id):
-        return "Expense deleted successfully."
-    return "Expense not found or could not be deleted."
-
-
-async def tool_import_bulk(ctx: RunContext[AgentDeps], file_path: str, month_key: str) -> str:
-    """Import transactions from a CSV file. Provide the server-side absolute file path."""
-    import csv, io
-    if not os.path.isfile(file_path):
-        return f"File not found: {file_path}"
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-    except Exception as e:
-        return f"Could not read file: {e}"
-    stream = io.StringIO(content, newline=None)
-    rows = list(csv.reader(stream))
-    paid, pending, personal, income_total, opening = [], [], [], 0, 0
-    section = None
-    for i, row in enumerate(rows):
-        clean = [str(c).strip() for c in row]
-        first = clean[0] if clean else ""
-        if "TOTAL EXPENSE LIST" in first or "PAYMENT REASON" in first:
-            section = "paid"; continue
-        if "PENDING" in first:
-            section = "pending"; continue
-        if "Personal Expenses" in first:
-            section = "personal"; continue
-        for ci, c in enumerate(clean):
-            if "INCOME IN CURRENT MONTH" in str(c):
-                try: income_total = float(clean[ci + 1].replace(",", ""))
-                except: pass
-            if "AVAILABLE FROM PREVIOUS MONTH" in str(c):
-                try: opening = float(clean[ci + 1].replace(",", ""))
-                except: pass
-        if first in ("PAYMENT REASON", "Type", ""):
-            continue
-        try:
-            ts = str(datetime.now().timestamp())
-            if section == "paid" and len(clean) >= 4 and clean[3]:
-                a = float(clean[3].replace(",", ""))
-                if a > 0: paid.append({"id": ts + str(i), "reason": clean[0], "category": clean[1], "date": clean[2], "amount": a, "mode": "Online"})
-            elif section == "pending" and len(clean) >= 4 and clean[3]:
-                a = float(clean[3].replace(",", ""))
-                pending.append({"id": ts + str(i), "reason": clean[0], "category": clean[1], "amount": a, "mode": clean[2]})
-            elif section == "personal":
-                ne = [c for c in clean if c]
-                if len(ne) >= 2:
-                    a = float(ne[-1].replace(",", ""))
-                    personal.append({"id": ts + str(i), "reason": ne[0], "date": "", "amount": a})
-        except: continue
-    data = {"income": [{"id": "csv-import", "source": "CSV Import", "amount": income_total, "account": "Cash"}], "openingBalance": {"Cash": opening}, "paidExpenses": paid, "pendingExpenses": pending, "personalExpenses": personal}
-    if ctx.deps.db.sync_bulk_data(ctx.deps.user_id, month_key, data):
-        total = len(paid) + len(pending) + len(personal)
-        return f"Imported {total} items from CSV into {month_key}."
-    return "Failed to import CSV data."
-
-
-async def tool_list_accounts(ctx: RunContext[AgentDeps]) -> str:
-    """List all financial accounts (bank accounts, cash buckets)."""
-    accs = ctx.deps.db.get_accounts(ctx.deps.user_id)
-    if not accs:
-        return "No accounts configured."
-    return "\n".join(f"  - {a['account_name']}" for a in accs)
-
-
-async def tool_add_account(ctx: RunContext[AgentDeps], account_name: str) -> str:
-    """Create a new financial account."""
-    if ctx.deps.db.add_account(ctx.deps.user_id, account_name):
-        return f"Account '{account_name}' created."
-    return f"Could not create account '{account_name}'. It may already exist."
-
-
-async def tool_update_account(ctx: RunContext[AgentDeps], old_name: str, new_name: str) -> str:
-    """Rename an existing financial account."""
-    if ctx.deps.db.update_account(ctx.deps.user_id, old_name, new_name):
-        return f"Account renamed from '{old_name}' to '{new_name}'."
-    return f"Could not rename account."
-
-
-async def tool_list_categories(ctx: RunContext[AgentDeps]) -> str:
-    """List all expense/income categories."""
-    cats = ctx.deps.db.get_categories(ctx.deps.user_id)
-    if not cats:
-        return "No categories configured."
-    return "\n".join(f"  - {c}" for c in cats)
-
-
-async def tool_add_category(ctx: RunContext[AgentDeps], category_name: str) -> str:
-    """Create a new expense/income category."""
-    if ctx.deps.db.add_category(ctx.deps.user_id, category_name):
-        return f"Category '{category_name}' created."
-    return f"Could not create category."
-
-
-async def tool_update_category(ctx: RunContext[AgentDeps], old_name: str, new_name: str) -> str:
-    """Rename an existing expense/income category."""
-    if ctx.deps.db.update_category(ctx.deps.user_id, old_name, new_name):
-        return f"Category renamed from '{old_name}' to '{new_name}'."
-    return f"Could not rename category."
-
-
-async def tool_list_long_pending(ctx: RunContext[AgentDeps]) -> str:
-    """List all active long-term debts/loans with remaining balances."""
-    items = ctx.deps.db.get_long_pending(ctx.deps.user_id)
-    if not items:
-        return "No long-term debts or loans."
-    lines = []
-    for i in items:
-        lines.append(f"  [{i['id']}] {i['reason']} — Total: {i['totalAmount']}, Paid: {i['paidAmount']}, Remaining: {i['remainingAmount']}")
-    return "\n".join(lines)
-
-
-async def tool_add_long_pending(ctx: RunContext[AgentDeps], reason: str, total_amount: float, category: str = "General", date: str = None) -> str:
-    """Create a new long-term debt/loan entry. reason and total_amount are required."""
-    item = {
-        "id": str(datetime.now().timestamp()),
-        "reason": reason,
-        "totalAmount": float(total_amount),
-        "paidAmount": 0,
-        "category": category,
-        "createdDate": date or datetime.now().strftime("%Y-%m-%d"),
-    }
-    if ctx.deps.db.add_long_pending(ctx.deps.user_id, item):
-        return f"Debt '{reason}' ({total_amount}) recorded."
-    return "Failed to create debt entry."
-
-
-async def tool_update_long_pending(ctx: RunContext[AgentDeps], id: str, reason: str, total_amount: float) -> str:
-    """Update a long-term debt/loan entry. Provide the id, new reason, and new total_amount."""
-    item = {"id": id, "reason": reason, "totalAmount": float(total_amount), "category": None}
-    if ctx.deps.db.update_long_pending(ctx.deps.user_id, item):
-        return "Debt entry updated."
-    return "Debt entry not found."
-
-
-async def tool_delete_long_pending(ctx: RunContext[AgentDeps], id: str) -> str:
-    """Permanently remove a long-term debt/loan record. Provide the id."""
-    if ctx.deps.db.delete_long_pending(ctx.deps.user_id, id):
-        return "Debt entry deleted."
-    return "Debt entry not found."
-
-
-async def tool_pay_long_pending(ctx: RunContext[AgentDeps], item_id: str, amount: float, account: str, month_key: str) -> str:
-    """Record a partial payment towards a long-term debt. Creates an expense in the specified month."""
-    if ctx.deps.db.make_partial_payment(ctx.deps.user_id, item_id, month_key, float(amount), account, "Online"):
-        return f"Payment of {amount} recorded towards debt."
-    return "Could not process payment."
-
-
-async def tool_list_months(ctx: RunContext[AgentDeps]) -> str:
-    """List all months that have financial data."""
-    months = ctx.deps.db.get_months(ctx.deps.user_id)
-    if not months:
-        return "No months found."
-    return "\n".join(f"  - {m}" for m in months)
-
-
-async def tool_create_month(ctx: RunContext[AgentDeps], month_key: str, copy_pending: bool = False) -> str:
-    """Initialize a new month for tracking finances. Use YYYY-MM format."""
-    result = ctx.deps.db.create_month(ctx.deps.user_id, month_key, copy_pending)
-    if result:
-        return f"Month {month_key} initialized."
-    return f"Could not create month {month_key}. It may already exist."
-
-
-async def tool_delete_month(ctx: RunContext[AgentDeps], month_key: str) -> str:
-    """Delete an entire month and all its financial data."""
-    if ctx.deps.db.delete_month(ctx.deps.user_id, month_key):
-        return f"Month {month_key} deleted."
-    return f"Could not delete month {month_key}."
-
-
-async def tool_add_note(ctx: RunContext[AgentDeps], month_key: str, title: str, content: str) -> str:
-    """Save a text note for a specific month."""
-    data = _read_month(ctx, month_key)
-    if data is None:
-        return f"Month {month_key} not found."
-    item = {"id": str(datetime.now().timestamp()), "title": title, "content": content, "date": datetime.now().strftime("%Y-%m-%d")}
-    data["notes"].append(item)
-    if _save_month(ctx, month_key, data):
-        return f"Note '{title}' saved to {month_key}."
-    return "Failed to save note."
-
-
-async def tool_get_account_balances(ctx: RunContext[AgentDeps], month_key: str) -> str:
-    """Get the running balance for each account in a given month. Computed as: opening balance + total income - total paid expenses (including personal/daily expenses) per account. Use YYYY-MM format for month_key."""
-    data = _read_month(ctx, month_key)
-    if data is None:
-        return f"Month {month_key} not found."
-    currency = ctx.deps.currency
-
-    ob = data.get("openingBalance", {})
-    if not isinstance(ob, dict):
-        ob = {}
-
-    # Track per-account income
-    account_income: dict[str, float] = {}
-    for inc in data["income"]:
-        acct = inc.get("account", "Cash")
-        account_income[acct] = account_income.get(acct, 0) + float(inc["amount"])
-
-    # Track per-account expenses (paid + personal)
-    account_expense: dict[str, float] = {}
-    for exp in data["paidExpenses"]:
-        acct = exp.get("account", "Cash")
-        account_expense[acct] = account_expense.get(acct, 0) + float(exp["amount"])
-    for exp in data["personalExpenses"]:
-        acct = exp.get("account", "Cash")
-        account_expense[acct] = account_expense.get(acct, 0) + float(exp["amount"])
-
-    all_accounts = set(list(ob.keys()) + list(account_income.keys()) + list(account_expense.keys()))
-    if not all_accounts:
-        return f"No account data for {month_key}."
-
-    lines = [f"Account Balances for {month_key} ({currency}):"]
-    for acct in sorted(all_accounts):
-        op = float(ob.get(acct, 0))
-        inc = account_income.get(acct, 0)
-        exp = account_expense.get(acct, 0)
-        balance = op + inc - exp
-        lines.append(f"  {acct}: {balance} {currency} (opening: {op}, income: {inc}, expenses: {exp})")
-
-    return "\n".join(lines)
-
-
-async def tool_get_last_expense_date(ctx: RunContext[AgentDeps]) -> str:
-    """Find the most recent expense entry across all months. Returns the date, amount, reason, and category of the latest expense."""
-    months = ctx.deps.db.get_months(ctx.deps.user_id)
-    if not months:
-        return "No months found. No expenses recorded yet."
-    months.sort(reverse=True)
-    latest = None
-    latest_month = None
-    for m in months:
-        data = _read_month(ctx, m)
-        if data is None:
-            continue
-        all_expenses = data.get("paidExpenses", []) + data.get("personalExpenses", [])
-        for e in all_expenses:
-            d = e.get("date", "")
-            if d and (latest is None or d > latest):
-                latest = d
-                latest_month = m
-    if latest is None:
-        return "No expenses found in any month."
-    return f"Last expense entry date: {latest} (in month {latest_month})"
-
-async def tool_get_profile(ctx: RunContext[AgentDeps]) -> str:
-    """Get user profile settings (name, currency, default account)."""
-    user = ctx.deps.db.get_user_by_id(ctx.deps.user_id)
-    if not user:
-        return "User not found."
-    default_id = user.get('default_account_id')
-    default_name = str(default_id) if default_id else 'Not set'
-    if default_id:
-        accounts = ctx.deps.db.get_accounts(ctx.deps.user_id)
-        for a in accounts:
-            if a['id'] == default_id:
-                default_name = a['account_name']
-                break
-    return (
-        f"Name: {user.get('name')}\n"
-        f"Email: {user.get('email') or 'Not set'}\n"
-        f"Phone: {user.get('phone') or 'Not set'}\n"
-        f"Currency: {user.get('currency_pref', 'INR')}\n"
-        f"Default Account: {default_name}"
+    args_dict = ", ".join(f"'{n}': {n}" for n in arg_names)
+    body = (
+        "async def proxy(ctx, " + (", ".join(arg_names) if arg_names else "") + "):\n"
+        "    _r = ctx.deps.mcp_server.call_tool(\n"
+        f"        {name!r}, {{{args_dict}}},\n"
+        "        user_id=ctx.deps.user_id,\n"
+        "        user_name=ctx.deps.user_name,\n"
+        f"        scope={_AGENT_SCOPE!r},\n"
+        "    )\n"
+        "    if isinstance(_r, dict) and 'error' in _r:\n"
+        "        return _r['error']\n"
+        "    return json.dumps(_r, default=str)"
     )
 
+    g: dict = dict(ns)
+    exec(compile(body, "<proxy>", "exec"), g)
+    proxy = g["proxy"]
+    proxy.__signature__ = sig
+    proxy.__annotations__ = annotations
+    return proxy
 
-async def tool_update_profile(ctx: RunContext[AgentDeps], name: str = None, currency_pref: str = None, default_account: str = None) -> str:
-    """Update user profile preferences (name, currency, default account). Provide default_account as the account NAME (e.g. 'Cash', 'SBI-2390')."""
-    kwargs = {}
-    if name is not None: kwargs["name"] = name
-    if currency_pref is not None: kwargs["currency_pref"] = currency_pref
-    if default_account is not None:
-        accounts = ctx.deps.db.get_accounts(ctx.deps.user_id)
-        account_id = None
-        for a in accounts:
-            if a['account_name'] == default_account:
-                account_id = a['id']
-                break
-        if account_id is None:
-            return f"Account '{default_account}' not found. Available accounts: {', '.join(a['account_name'] for a in accounts)}"
-        kwargs["default_account_id"] = account_id
-    if not kwargs:
-        return "No changes requested."
-    if ctx.deps.db.update_user(ctx.deps.user_id, **kwargs):
-        return "Profile updated."
-    return "Failed to update profile."
+
+def _build_tools(mcp_server: Any) -> list[Tool]:
+    """Build one pydantic-ai Tool per registered MCP tool."""
+    if mcp_server is None:
+        return []
+    tools: list[Tool] = []
+    for tool_def in mcp_server.list_tools()["tools"]:
+        proxy = _make_tool_proxy(tool_def["name"], tool_def["inputSchema"])
+        tools.append(
+            Tool(
+                proxy,
+                takes_ctx=True,
+                name=tool_def["name"],
+                description=tool_def["description"],
+            )
+        )
+    return tools
 
 
 # ─────────────────────────────────────────────────────────
-#  Agent tools registry
+#  System prompt
 # ─────────────────────────────────────────────────────────
 
-AGENT_TOOLS = [
-    tool_get_summary,
-    tool_get_month_data,
-    tool_get_account_balances,
-    tool_get_last_expense_date,
-    tool_add_paid_expense,
-    tool_add_income,
-    tool_add_pending_item,
-    tool_transfer_funds,
-    tool_delete_expense,
-    tool_import_bulk,
-    tool_list_accounts,
-    tool_add_account,
-    tool_update_account,
-    tool_list_categories,
-    tool_add_category,
-    tool_update_category,
-    tool_list_long_pending,
-    tool_add_long_pending,
-    tool_update_long_pending,
-    tool_delete_long_pending,
-    tool_pay_long_pending,
-    tool_list_months,
-    tool_create_month,
-    tool_delete_month,
-    tool_add_note,
-    tool_get_profile,
-    tool_update_profile,
-]
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful financial assistant for MTracker, a personal expense "
+    "tracking application. You have tools to read and write the user's "
+    "financial data. "
+    "CRITICAL: You MUST use the provided tools to answer ANY question about "
+    "the user's financial data. Do NOT rely on your own knowledge. "
+    "For questions about specific expenses, dates, or amounts, use "
+    "get_month_data which returns all income, expenses (with dates), and "
+    "pending items for a month. Use list_months first to find which months "
+    "exist. Use get_summary for high-level totals. Use get_last_expense_date "
+    "to find the most recent expense entry. "
+    "There are TWO types of expenses: regular paid expenses and "
+    "personal/daily expenses (small daily spends logged as daily logs). "
+    "Both count toward total expenses. "
+    "Always confirm before writing data. Answer clearly and concisely."
+)
 
 
 # ─────────────────────────────────────────────────────────
@@ -580,78 +215,76 @@ AGENT_TOOLS = [
 
 _agent_cache: dict[str, dict] = {}
 
+
 def _is_system_msg(msg) -> bool:
     return isinstance(msg, ModelRequest) and any(
         p.part_kind == 'system-prompt' for p in msg.parts
     )
 
 
-def create_agent(system_prompt: str | None = None):
-    """Create (or return a cached) Pydantic AI agent with MCP tools."""
-    global _agent_cache
-    if "default" in _agent_cache:
-        return _agent_cache["default"]
+def create_agent(mcp_server: Any = None, system_prompt: str | None = None) -> dict:
+    """Create (or return a cached) Pydantic AI agent with MCP-driven tools.
 
-    system_prompt = system_prompt or (
-        "You are a helpful financial assistant for MTracker, "
-        "a personal expense tracking application. You have tools "
-        "to read and write the user's financial data. "
-        "CRITICAL: You MUST use the provided tools to answer ANY question "
-        "about the user's financial data. Do NOT rely on your own knowledge. "
-        "For questions about specific expenses, dates, or amounts, use "
-        "tool_get_month_data which returns all income, expenses (with dates), "
-        "and pending items for a month. Use tool_list_months first to find "
-        "which months exist. Use tool_get_summary for high-level totals. "
-        "Use tool_get_last_expense_date to find the most recent expense entry. "
-        "There are TWO types of expenses: regular paid expenses and "
-        "personal/daily expenses (small daily spends logged as daily logs). "
-        "Both count toward total expenses. "
-        "Always confirm before writing data. Answer clearly and concisely."
-    )
+    The cache is keyed by ``mcp_server`` instance, so a fresh server builds a
+    fresh tool set.
+    """
+    key = f"agent:{id(mcp_server) if mcp_server is not None else 'none'}"
+    if key in _agent_cache:
+        return _agent_cache[key]
 
     model = _make_model()
     agent = Agent(
         model=model,
-        system_prompt=system_prompt,
+        system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
         deps_type=AgentDeps,
-        tools=AGENT_TOOLS,
+        tools=_build_tools(mcp_server),
     )
-    _agent_cache["default"] = {
-        "agent": agent,
-        "history": [],
-    }
-    return _agent_cache["default"]
+    entry = {"agent": agent, "history": []}
+    _agent_cache[key] = entry
+    return entry
 
 
 def get_response(
     message: str,
     *,
     user_id: str,
-    db: Any,
+    mcp_server: Any,
+    db: Any = None,
 ) -> str:
     """Send a message to the agent and return its text reply.
 
-    Automatically loads user profile for currency, name, and default account.
-    Injects today's date and user's currency as per-call instructions
-    (so cached agents always have fresh context).
-    Conversation history is maintained.
-    """
-    global _agent_cache
+    Args:
+        message: The user's message.
+        user_id: The MTracker user id the agent acts as.
+        mcp_server: An ``MTrackerMCPServer`` instance providing all tools.
+        db: Optional DatabaseController used only to pre-fetch profile context.
+            If omitted, profile context is fetched via the ``get_profile`` tool.
 
-    # Load user profile for dynamic context
-    user = db.get_user_by_id(user_id) if db else None
-    user_name = user.get("name", "User") if user else "User"
-    currency = user.get("currency_pref", "INR") if user else "INR"
+    All tools execute through ``mcp_server.call_tool(...)``. Conversation
+    history is maintained.
+    """
+    if mcp_server is None:
+        raise ValueError("mcp_server is required for the agent to access tools.")
+
+    # Load user profile for dynamic context (db is a fast path; fall back to
+    # the get_profile tool when no db handle is available).
+    profile = None
+    if db is not None:
+        profile = db.get_user_by_id(user_id)
+    if profile is None:
+        prof_result = mcp_server.call_tool("get_profile", {}, user_id=user_id, user_name="User", scope=_AGENT_SCOPE)
+        if isinstance(prof_result, dict) and "error" not in prof_result:
+            profile = prof_result
+
+    user_name = (profile or {}).get("name") or "User"
+    currency = (profile or {}).get("currency_pref") or "INR"
+
+    entry = create_agent(mcp_server)
+    agent = entry["agent"]
+    deps = AgentDeps(user_id=user_id, user_name=user_name, currency=currency, mcp_server=mcp_server)
 
     today = datetime.now().strftime("%Y-%m-%d")
     current_month = datetime.now().strftime("%Y-%m")
-
-    if "default" not in _agent_cache:
-        create_agent()
-
-    entry = _agent_cache["default"]
-    agent = entry["agent"]
-    deps = AgentDeps(user_id=user_id, db=db, user_name=user_name, currency=currency)
 
     # Per-call instructions (always fresh — not cached with the agent)
     instructions = (
@@ -680,7 +313,7 @@ def get_response(
 
 
 def reset_agent():
-    """Drop the cached agent."""
+    """Drop the cached agents."""
     global _agent_cache
     _agent_cache.clear()
 
@@ -690,6 +323,20 @@ def reset_agent():
 # ─────────────────────────────────────────────────────────
 
 def main() -> None:
+    from database_controller import DatabaseController
+    from mcp_server import MTrackerMCPServer
+
+    db = DatabaseController(
+        {
+            'host': os.getenv('host'),
+            'user': os.getenv('user'),
+            'password': os.getenv('password'),
+            'database': os.getenv('database'),
+        }
+    )
+    mcp_server = MTrackerMCPServer(db)
+    user_id = os.getenv("CLI_USER_ID", "cli")
+
     print(f"\n MTracker Agent  |  model: {MODEL_ID}")
     print("─" * 50)
     print("Type 'quit' or 'exit' to stop.\n")
@@ -698,11 +345,14 @@ def main() -> None:
         try:
             user_input = input("You > ").strip()
         except (EOFError, KeyboardInterrupt):
-            print(); break
-        if not user_input: continue
-        if user_input.lower() in ("quit", "exit"): break
+            print()
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit"):
+            break
 
-        reply = get_response(user_input, user_id="cli", db=None)
+        reply = get_response(user_input, user_id=user_id, mcp_server=mcp_server, db=db)
         print(f"Agent > {reply}\n")
 
 

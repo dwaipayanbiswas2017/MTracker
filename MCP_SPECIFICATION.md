@@ -1,155 +1,255 @@
 # MTracker Model Context Protocol (MCP) Specification
 
-This document outlines the proposed integration of the Model Context Protocol (MCP) into the MTracker application. This will allow AI agents (like Claude or Gemini) to interact directly with your financial data to provide insights, record transactions, and manage budgets.
+This document describes the live Model Context Protocol integration in MTracker. AI agents (Claude, Gemini, VSCode, and the built-in Pydantic AI assistant) interact with user financial data through 16 tools served over JSON-RPC 2.0 + SSE, plus 4 state resources. Everything below reflects the actual implementation in `mcp_server.py`, `app.py`, `agent.py`, and `database_controller.py`.
+
+*Status: Implemented and in production*
+*Tool count: 16 · Resources: 4 · Server: `mtracker/1.1.0`*
 
 ## 1. Architecture Overview
 
-The MTracker MCP integration utilizes **HTTP with Server-Sent Events (SSE)** to provide a web-native, stateful connection between the MTracker backend and AI clients.
+### Single source of truth
 
-### 🔄 Data Flow (SSE Transport)
-1.  **Connection Establishment:** The client initiates a `GET` request to `/api/mcp/sse`.
-2.  **Event Stream:** The server keeps the connection open, sending an `endpoint` event containing the URL for client-to-server POST requests (e.g., `/api/mcp/messages?session_id=...`).
-3.  **Client Requests:** The client sends JSON-RPC 2.0 messages via `POST` to the message endpoint.
-4.  **Server Responses:** The server processes the request (e.g., querying the DB) and streams the response back via the SSE channel.
+All 16 tools are implemented **exactly once** in `mcp_server.py` (`MTrackerMCPServer._register_tools`). There are no duplicate agent-side implementations. Each tool is declared as an `MCPTool` with:
 
-### 🏗️ Internal Components
-- **Auth Middleware:** Intercepts the `Authorization` header, validates the PAT, and injects the `user_id` into the request context.
-- **MCP Router:** Maps JSON-RPC tool calls to specific `DatabaseController` methods.
-- **Session Manager:** Tracks active SSE connections and ensures responses are routed to the correct client.
+| Field | Purpose | Seen by |
+|---|---|---|
+| `name` | Tool identifier (e.g. `get_summary`) | AI + wire clients |
+| `description` | Rich usage documentation | AI (this is what the model reasons from) |
+| `input_schema` | JSON Schema of parameters (types, descriptions, required) | AI + wire clients |
+| `handler` | `(user_id, user_name, **kwargs) -> dict` implementation | server only |
+| `read_only` | `True` = callable under a `read`-scoped token (standalone tools) | auth layer |
+| `read_actions` | set of `action` values callable under a `read`-scoped token; `None` = fall back to `read_only` (grouped tools) | auth layer |
 
-## 2. Authentication Implementation
+### Two consumers of the same registry
 
-Authentication is handled via a **Bearer Token** in the HTTP headers of both the initial SSE request and all subsequent message POSTs.
+- **`agent.py` (Pydantic AI, in-process)** — reads the registry at startup, builds one typed `Tool` proxy per entry from its JSON Schema (`_make_tool_proxy`), and routes every call through `MTrackerMCPServer.call_tool(name, args, user_id=…, user_name=…, scope="read_write")`. The agent always acts with its user's full permissions.
+- **Over-the-wire MCP (external clients)** — `MTrackerMCPServer.dispatch(message, user_id, user_name, scope)` serves spec-compliant JSON-RPC 2.0 over SSE (`GET /api/mcp/sse` + `POST /api/mcp/messages`).
 
-**Example Headers:**
+### Data flow (SSE transport)
+
+1. Client `GET /api/mcp/sse` with `Authorization: Bearer mt_live_…` → server creates a session, replies with an `event: endpoint` message containing the POST URL (`/api/mcp/messages?session_id=…`), then holds the stream open.
+2. Client `POST`s JSON-RPC 2.0 messages to that URL → server dispatches and queues responses into the session.
+3. The SSE stream drains the queue (every 0.5s) as `data: {json}` events.
+4. POSTs without a matching session get the JSON-RPC response returned inline instead.
+
+### Session constraint (operational)
+
+Sessions live in **process memory** (`MCPSessionManager`, thread-safe via locks, 5-minute stale cleanup). Gunicorn must therefore run as a **single gthread worker** (`--workers 1 --threads N --worker-class gthread`, see `Dockerfile`): multiple sync workers split session state across processes and clients hang on `initialize`. A session-miss is logged as a warning (`MCP session miss for session_id=…`). Roll out with `./deploy.sh`, which rebuilds the image, redeploys, waits for readiness, and verifies the live routes (`200` login, `401` SSE auth gate, `302` on the user pages).
+
+### Internal components
+
+- **Auth middleware** (`app._mcp_authenticate`): validates the Bearer PAT via `db.validate_pat`, refreshes `last_used_at`, injects `user_id`/`user_name`/`scope`.
+- **Dispatcher** (`MTrackerMCPServer.dispatch`): JSON-RPC 2.0 router — batch requests, notifications (no `id` → no reply), lifecycle methods, standard error codes.
+- **Session manager**: per-connection response queues drained by the SSE event stream.
+- **Audit**: every write tool logs via `db.log_audit(…, origin='mcp')`.
+
+## 2. HTTP Endpoints
+
+All MCP routes live in `app.py`. CSRF is exempt on the wire-transport routes (PAT auth replaces session auth); the page and token-management routes use the normal logged-in session + CSRF token.
+
+| Endpoint | Method | Auth | Handler | Purpose |
+|---|---|---|---|---|
+| `/api/mcp/sse` | GET | Bearer PAT | `mcp_sse` | SSE stream (server → client). Emits `endpoint` event, then queued responses. Anti-buffering headers (`Cache-Control: no-cache`, `X-Accel-Buffering: no`). |
+| `/api/mcp/messages` | POST | Bearer PAT | `mcp_messages` | JSON-RPC in (client → server). `?session_id=` routes into the SSE stream (`{"status":"queued"}`); without a session the response is returned inline. |
+| `/api/mcp/tokens` | POST | login session | `mcp_create_token` | Create PAT. Body: `name` (required, ≤64 chars), `scope` (`read`/`read_write`), optional `expires_in_days` (positive int). Max 10 active tokens per user. Returns the raw token **once**. |
+| `/api/mcp/tokens` | GET | login session | `mcp_list_tokens` | List active PATs (metadata only — never raw values). |
+| `/api/mcp/tokens/<pat_id>` | DELETE | login session | `mcp_revoke_token` | Revoke a PAT (immediate effect). |
+| `/api-keys` | GET | login session | `api_keys_page` | Self-service token management UI (`templates/api_keys.html`). |
+| `/mcp-help` | GET | login session | `mcp_help_page` | Setup guide + live tool/resource reference (`templates/mcp_help.html`, rendered from the registry). |
+
+## 3. Authentication
+
+Bearer PAT in the `Authorization` header of **both** the SSE request and every message POST:
+
 ```http
 GET /api/mcp/sse HTTP/1.1
-Host: mtracker.yourdomain.com
-Authorization: Bearer mt_live_xyz123...
+Host: mtracker.example.com
+Authorization: Bearer mt_live_abc123…
 Accept: text/event-stream
 ```
 
-## 3. Client Configuration Sample
+- **Format:** `mt_live_` + 64 hex chars. Only the SHA-256 hash is stored (`personal_access_tokens.token_hash`); the raw value is shown once at creation.
+- **Validation** (`db.validate_pat`): prefix check → hash lookup → must be unrevoked, unexpired, and belong to an active user. Returns `{user_id, user_name, scope}`.
+- **Scopes:**
 
-To connect an LLM client (like Claude Desktop) to MTracker, use the following configuration in your `claude_desktop_config.json`:
+| Scope | Allows |
+|---|---|
+| `read` | Read-only surface only: the 4 standalone reads plus the per-tool read actions — `manage_pending/list`, `manage_accounts/list`, `manage_categories/list`, `manage_debts/list`, `manage_notes/list`, `manage_months/list`, `manage_profile/get`, `manage_tokens/list`. Anything else (including missing/unknown `action`) fails closed with `"Read-only token cannot perform this action"` (standalone writes: `"Read-only token cannot perform write operations"`). |
+| `read_write` | All 16 tools, all actions. |
 
-```json
-{
-  "mcpServers": {
-    "mtracker": {
-      "url": "https://mtracker.yourdomain.com/api/mcp/sse",
-      "env": {
-        "MTRACKER_API_KEY": "your_generated_pat_here"
-      }
-    }
-  }
-}
-```
+## 4. Protocol
 
-*Note: The actual client implementation (e.g., using `@modelcontextprotocol/sdk`) will handle the SSE handshake and message passing automatically.*
+- **Versions:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")`. `initialize` echoes the client's version when supported, else falls back to `2024-11-05`. (Required: modern clients such as VSCode offer `2025-11-25` and drop the session if the server insists on an unsupported version.)
+- **Server info:** `{name: "mtracker", version: "1.1.0"}` · **Capabilities:** `{tools: {listChanged: false}, resources: {}}`.
+- **Lifecycle:** `initialize` → `notifications/initialized` → `tools/list` → `tools/call`; `ping` → `{}`; `resources/list`, `resources/read`.
+- **Error codes:** `-32700` parse · `-32600` invalid request (incl. empty batch) · `-32601` method/tool not found · `-32602` invalid params · `-32603` internal · `-32000` server/scope errors.
+- **`tools/call` result envelope:** `{"content": [{"type": "text", "text": …}], "structuredContent": <raw result>, "isError": bool}`. Any handler result containing an `"error"` key yields `isError: true` with the message as text.
 
-## 4. Available Functionalities
+## 5. Tools Reference (live registry)
 
-### 📊 Tools (Actions)
-These allow the AI to perform operations on the user's behalf.
+`*` = required. `RO` = read-only (usable with `read` scope). Descriptions below are the exact AI-facing `description` strings from the registry.
 
-#### 💰 Transaction Management
-| Tool | Description | Parameters |
-| :--- | :--- | :--- |
-| `get_summary` | High-level summary (Income, Expense, Balance) for a month. | `month_key` |
-| `get_month_data` | Full state of a month (Income, Paid, Pending, Notes). | `month_key` |
-| `add_paid_expense` | Record a completed transaction. | `month_key`, `amount`, `reason`, `category`, `account`, `date` |
-| `add_income` | Record a new income source. | `month_key`, `amount`, `source`, `account` |
-| `add_pending_item` | Add an item to the monthly budget/pending list. | `month_key`, `amount`, `reason`, `category` |
-| `transfer_funds` | Move money between accounts (creates linked paid expense + income). | `month_key`, `from_account`, `to_account`, `amount`, `reason` |
-| `delete_expense` | Remove an expense (reverses balance if it was a debt payment). | `month_key`, `expense_id` |
-| `import_bulk` | Process a CSV file to bulk-save transactions. | `file_path`, `month_key` |
+### 💰 Financial data query (all RO)
 
-#### 💳 Accounts & Categories
-| Tool | Description | Parameters |
-| :--- | :--- | :--- |
-| `list_accounts` | Fetch all bank accounts and cash buckets. | - |
-| `add_account` | Create a new financial account. | `account_name` |
-| `update_account` | Rename an existing account. | `old_name`, `new_name` |
-| `list_categories` | Fetch all expense/income categories. | - |
-| `add_category` | Create a new transaction category. | `category_name` |
-| `update_category` | Rename an existing category. | `old_name`, `new_name` |
+| Tool | RO | Parameters | Description & result |
+|---|---|---|---|
+| `get_summary` | ✅ | `month_key`* (`YYYY-MM`) | High-level summary: total income, total expenses (paid + personal/daily), net balance, per-account opening balances, transaction counts. Returns `{month_key, total_income, total_expenses, total_paid_expenses, total_personal_expenses, opening_balance, net_balance, transaction_count, pending_count, note_count}` or `{"error": …}` when the month is missing. |
+| `get_month_data` | ✅ | `month_key` (default current), `sections` (optional subset) | Full month state: income, paid/personal/pending expenses, notes, per-account opening balances. Raw dict (large — prefer `get_summary` for totals). |
+| `get_account_balances` | ✅ | `month_key`* | Per-account running balance: opening + income − expenses (paid + personal/daily). Returns `{month_key, balances: [{account, opening_balance, income, expenses, balance}]}`. |
+| `get_last_expense_date` | ✅ | - | Latest expense with full details. Returns `{last_expense_date, month_key, amount, reason, category, account}`. |
+| `get_month_data` sections | n/a | `sections` (optional array of `income`, `paidExpenses`, `personalExpenses`, `pendingExpenses`, `notes`, `openingBalance`) | Returns only the requested sections instead of the full month. Unknown names yield an error listing the allowed values. |
 
-#### 📉 Long Pending (Debts & Loans)
-| Tool | Description | Parameters |
-| :--- | :--- | :--- |
-| `list_long_pending` | Fetch all active debts/loans and remaining balances. | - |
-| `add_long_pending` | Create a new long-term debt/loan entry. | `reason`, `total_amount`, `category`, `date` |
-| `update_long_pending`| Update debt details (amount or reason). | `id`, `reason`, `total_amount` |
-| `delete_long_pending`| Permanently remove a debt record. | `id` |
-| `pay_long_pending` | Record a partial payment towards a debt. | `item_id`, `amount`, `account`, `month_key` |
+> **Grouped tools** (v1.1.0): related operations share one tool with an `action`
+> enum. Only `action` is schema-required; per-action required fields are listed
+> below and enforced at runtime. `month_key` defaults to the current month
+> everywhere except `manage_months/delete`, which requires it explicitly.
+> `RO` lists the actions a `read`-scoped token may run (anything else, including
+> missing/unknown actions, fails closed).
 
-#### 📝 Notes & Months
-| Tool | Description | Parameters |
-| :--- | :--- | :--- |
-| `list_months` | Get list of all months with data. | - |
-| `create_month` | Initialize a new month (with optional carry-forward). | `month_key`, `copy_pending` |
-| `delete_month` | Delete an entire month's data. | `month_key` |
-| `add_note` | Save a text note for a specific month. | `month_key`, `title`, `content` |
+### 💸 Expenses — `manage_expenses` (all actions write)
 
-#### 👤 Profile
-| Tool | Description | Parameters |
-| :--- | :--- | :--- |
-| `get_profile` | Get user settings (currency, default account). | - |
-| `update_profile` | Update user preferences. | `name`, `currency_pref`, `default_account_id` |
+| Action | Needs | Behavior |
+|---|---|---|
+| `add_paid` | `amount`, `reason`, `category` (must exist), `account` (must exist) | Regular non-daily expense. Returns `{status, id, message}`. |
+| `add_daily` | `amount`, `reason`, `account` (must exist) | Daily/personal spend (`is_daily_log=TRUE`); category defaults to `Personal`. |
+| `update` | `expense_id` (+ any of `amount`, `reason`, `category`, `account`, `date`) | In-place edit across paid + personal lists. Transfer-/debt-linked entries rejected. |
+| `delete` | `expense_id` | Cascade-aware delete (reverses debt payments, drops linked transfer income). |
 
-### 📂 Resources (State)
-These provide the AI with long-lived context about the user's setup.
+### 💰 Income — `manage_income` (all actions write)
 
-- `mtracker://accounts`: List of configured bank accounts/cash buckets.
-- `mtracker://categories`: List of active expense and income categories.
-- `mtracker://debts/active`: List of all outstanding loans and dues.
-- `mtracker://schema`: Structural information about how MTracker stores data.
+| Action | Needs | Behavior |
+|---|---|---|
+| `add` | `amount`, `source`, `account` | New income entry. Returns `{status, id, message}`. |
+| `update` | `income_id` (+ `amount`/`source`/`account`) | In-place edit; transfer-linked entries rejected. |
+| `delete` | `income_id` | Removes entry (+ linked transfer expense, noted in message). |
 
-## 4. Security & Privacy
+### 📋 Budget — `manage_pending` (RO: `list`)
 
-- **Data Isolation:** All queries are strictly filtered by `user_id`.
-- **Read/Write Scopes:** Tokens can be configured as "Read-Only" for safe analysis.
-- **Audit Logging:** Every action performed via MCP is logged in the `audit_log` table with an `origin='mcp'` tag.
-- **Local First:** The MCP server runs on the same infrastructure as the MTracker app, ensuring data never leaves the controlled environment except for the LLM processing.
+| Action | Needs | Behavior |
+|---|---|---|
+| `add` | `amount`, `reason`, `category` | Planned/unpaid budget item. |
+| `list` | — | All planned items (raw list). |
+| `delete` | `item_id` | Drops the plan only; paid expenses untouched. |
 
-## 5. Implementation Notes
+### 🔀 Transfers & bulk
 
-The following tools map directly to existing `DatabaseController` methods:
+| Tool | RO | Parameters | Description, behavior & errors |
+|---|---|---|---|
+| `transfer_funds` | ❌ | `from_account`*, `to_account`*, `amount`*, `month_key` (default current), `reason` (default `Fund Transfer`) | Linked expense + income pair sharing a `__transfer__:<ref>` marker (auto-creates the `Transfer` category). Deleting one side removes the other. Returns `{status, transfer_ref, expense_id, income_id, message}`. |
+| `import_bulk` | ❌ | `month_key` (default current), `csv_text`? (raw CSV, preferred) OR `file_path`? (server path) — exactly one required | Parses CSV sections and syncs via `db.sync_bulk_data`. Returns `{status, items_imported, message}`. |
 
-- `get_month_data` → `get_month_data(user_id, month_key)` (line 298)
-- `delete_expense` → `delete_expense(user_id, month_key, expense_id)` (line 599)
-- `list_accounts` → `get_accounts(user_id)` (line 209)
-- `add_account` → `add_account(user_id, account_name)` (line 220)
-- `update_account` → `update_account(user_id, old_name, new_name)` (line 233)
-- `list_categories` → `get_categories(user_id)` (line 169)
-- `add_category` → `add_category(user_id, category_name)` (line 180)
-- `update_category` → `update_category(user_id, old_name, new_name)` (line 193)
-- `list_long_pending` → `get_long_pending(user_id)` (line 498)
-- `add_long_pending` → `add_long_pending(user_id, item_data)` (line 515)
-- `update_long_pending` → `update_long_pending(user_id, item_data)` (line 539)
-- `delete_long_pending` → `delete_long_pending(user_id, item_id)` (line 562)
-- `pay_long_pending` → `make_partial_payment(user_id, item_id, month_key, amount, account, mode)` (line 574)
-- `list_months` → `get_months(user_id)` (line 251)
-- `create_month` → `create_month(user_id, month_key, copy_pending)` (line 262)
-- `delete_month` → `delete_month(user_id, month_key)` (line 284)
-- `get_profile` → `get_user_by_id(user_id)` (line 30)
-- `update_profile` → `update_user(user_id, ...)` (line 121)
+### 🏦 Accounts — `manage_accounts` (RO: `list`)
 
-The following tools require **new `DatabaseController` methods** — the codebase currently persists all month data via a full-state sync (`save_month_data`, line 393):
+| Action | Needs | Behavior |
+|---|---|---|
+| `list` | — | All bank accounts / cash buckets (`[{id, account_name, …}]`). |
+| `add` | `account` | Creates a bank/cash/wallet account. Errors if it exists. |
+| `update` | `old_name`, `new_name` | Renames an account. |
+| `set_opening_balance` | `account`, `amount` (may be zero/negative) | Overwrites one account's opening balance (`month_key` defaults to current). |
 
-- `get_summary` — no equivalent method; summary must be computed from `get_month_data` response
-- `add_paid_expense`, `add_income`, `add_pending_item`, `add_note` — no single-record insert methods exist; each will need either a dedicated `DatabaseController` method or should wrap `save_month_data` (read current state → append → write back)
-- `transfer_funds` — requires a new method that inserts a linked paid expense + income pair with a `__transfer__:<ref>` marker in the `notes` column
-- `import_bulk` — CSV import exists at `app.py:570` as a file-upload endpoint; the MCP tool should accept a file path and delegate to the same parser logic
+### 🏷️ Categories — `manage_categories` (RO: `list`)
 
-## 6. Potential Use Cases
+| Action | Needs | Behavior |
+|---|---|---|
+| `list` | — | All expense/income category names. |
+| `add` | `category_name` | Creates a category. Errors if it exists. |
+| `update` | `old_name`, `new_name` | Renames a category. |
 
-1.  **Conversational Analysis:** *"How much did I spend on groceries in the last 3 months?"*
-2.  **Automated Entry:** *"I just spent 450 on fuel via UPI, add it to my current month."*
-3.  **Budget Forecasting:** *"Based on my last 6 months of EMI and bills, how much will I likely save next month?"*
-4.  **Debt Tracking:** *"What is the remaining balance on my Home Loan?"*
+### 📉 Debts & loans — `manage_debts` (RO: `list`)
 
----
-*Status: Proposed Integration*  
-*Target Version: v4.0*
+| Action | Needs | Behavior |
+|---|---|---|
+| `list` | — | Active debts with remaining balances, totals, payment status. |
+| `add` | `reason`, `total_amount` | New debt/loan (`paidAmount: 0`); category/date defaulted. |
+| `update` | `id`, `reason`, `total_amount` | Full replacement (both overwritten). |
+| `delete` | `id` | Permanent removal. |
+| `pay` | `id`, `amount`, `account` (+ `month_key`, default current) | Partial payment via `sp_pay_long_pending`; creates a linked expense (no `__transfer__` marker). |
+
+### 📅 Months — `manage_months` (RO: `list`)
+
+| Action | Needs | Behavior |
+|---|---|---|
+| `list` | — | All months with recorded data. |
+| `create` | `month_key` (default current), `copy_pending` | Initializes via `sp_create_month`; errors if it exists. |
+| `delete` | `month_key` (**required, never defaulted**) | Deletes month + all data. **Irreversible — confirm first.** |
+
+### 📝 Notes — `manage_notes` (RO: `list`)
+
+| Action | Needs | Behavior |
+|---|---|---|
+| `add` | `title`, `content` | Dated text note. |
+| `list` | — | All notes for the month. |
+| `delete` | `note_id` | Permanent removal. Notes cannot be edited. |
+
+### 👤 Profile & 🔑 API Tokens
+
+| Tool | RO | Parameters | Description |
+|---|---|---|---|
+| `manage_profile` | `get` | `action`*, + `name`/`currency_pref`/`default_account` (NAME e.g. `Cash`)/`default_account_id` for `update` | `get` returns `{name, email, phone, currency_pref, default_account_id}`; `update` resolves account NAME→ID. |
+| `manage_tokens` | `list` | `action`*, `pat_id` (for `revoke`) | `list` returns token metadata (never raw values); `revoke` takes effect immediately. Token *creation* is web-UI-only (`/api-keys`), never exposed over MCP. |
+
+### Handler → DB mapping
+
+Grouped dispatchers delegate to the original handlers, which map as follows. Computed from `get_month_data`: `get_summary`, `get_account_balances`, `get_last_expense_date`. Read-modify-write via `save_month_data`: expenses, income, pending, transfers, opening balances, notes. Direct DB methods: deletes/updates of expenses (`delete_expense`), accounts, categories, long-pending (`get/add/update/delete_long_pending`, `make_partial_payment`), months (`get_months`, `create_month`, `delete_month`), `sync_bulk_data`, `get_user_by_id`, `update_user`, `list_pats`, `revoke_pat`.
+
+## 6. Resources
+
+| URI | Content |
+|---|---|
+| `mtracker://accounts` | `db.get_accounts(user_id)` |
+| `mtracker://categories` | `db.get_categories(user_id)` |
+| `mtracker://debts/active` | `db.get_long_pending(user_id)` |
+| `mtracker://schema` | Static table/column map (months, income, paid/pending expenses, opening_balances, notes, long_pending, categories, accounts, users) |
+
+## 7. Client configuration
+
+Claude Desktop speaks stdio, so remote access goes through the `mcp-remote` bridge (requires Node.js); VSCode connects natively over SSE with a static header. The `/mcp-help` page renders both configs live with the deployment's real SSE URL — copy them from there rather than hand-writing:
+
+- **Claude Desktop** (`claude_desktop_config.json`): `{mcpServers: {mtracker: {command: "npx", args: ["-y", "mcp-remote", "<sse-url>", "--header", "Authorization: Bearer mt_live_…"]}}}` — restart the app after saving.
+- **VSCode** (`.vscode/mcp.json`): `{servers: {mtracker: {type: "sse", url: "<sse-url>", headers: {Authorization: "Bearer ${input:mtracker-pat}"}}}, inputs: [{type: "promptString", id: "mtracker-pat", password: true, …}]}` — then `MCP: List Servers` → start. No OAuth exists server-side; skip any client-registration prompt.
+- **Generic clients**: `GET <sse-url>` (Bearer + `Accept: text/event-stream`) → read `endpoint` event → `POST` JSON-RPC to the given messages URL.
+
+## 8. Security & Privacy
+
+- **Data isolation:** every tool and resource call is filtered by the PAT's `user_id`.
+- **Least privilege:** `read` scope exposes only read actions (4 standalone reads + `list`/`get` actions on the grouped tools; see §3); `read_write` unlocks all 16 tools. Grouped `read_actions` fail closed on missing/unknown actions.
+- **Audit logging:** all writes logged with `origin='mcp'` (reads are not logged).
+- **Token hygiene:** raw values shown once, hashes only at rest, 10-token cap per user, instant revocation, `last_used_at` tracking.
+- **Transport:** CSRF-exempt wire routes rely solely on PAT auth; user pages keep session + CSRF.
+- **Local-first:** the MCP server runs on the same infrastructure as the app; data leaves only toward the LLM at query time.
+
+## 9. Coverage log & remaining limitations
+
+### v1.1.0 consolidation (38 → 16 tools)
+
+Entity-grouped tools with an `action` enum replaced the flat per-operation
+tools; the old names are retired (unknown names return `Tool not found`).
+`month_key` defaults to the current month everywhere except
+`manage_months/delete`. Read scoping moved from per-tool flags to per-action
+`read_actions` (fail-closed). `serverInfo` bumped to `1.1.0`. Token creation
+was deliberately left out of `manage_tokens` (list/revoke only) — new tokens
+are minted on the `/api-keys` web page so the show-once secret never passes
+through model context.
+
+### Completed improvement rounds
+
+- **Daily/personal-expense writes** — `add_daily_expense` (`is_daily_log=TRUE`), now folded into `manage_expenses/add_daily`.
+- **Remote bulk import** — `import_bulk` accepts pasted `csv_text` (exactly one of `csv_text`/`file_path`).
+- **Pending-item management** — `list_pending_items` / `delete_pending_item`, now folded into `manage_pending`.
+- **In-place edits** — `update_expense` (paid + personal, linked-entry guards), `update_income`, `delete_income` (transfer cascade), `delete_note`, now folded into `manage_expenses` / `manage_income` / `manage_notes`.
+- **Opening balances** — `set_opening_balance`, now folded into `manage_accounts`.
+- **PAT self-service** — `list_pats` / `revoke_pat`, now folded into `manage_tokens` (creation deliberately web-UI-only).
+- **Richer reads** — `get_last_expense_date` returns amount/reason/category/account; `get_month_data` accepts a `sections` filter; `month_key` defaults to the current month (except `manage_months/delete`).
+- **Token expiry** — `db.create_pat(..., expires_at=...)`, honored by `validate_pat`; exposed via the REST token endpoint (`expires_in_days`).
+- **Docstrings** — all handlers carry docstrings; grouped registry descriptions document per-action requirements.
+
+### Deliberately out of scope (not gaps)
+
+- **Auth & identity** (login/register/logout/password/OTP/email/phone/PIN, profile-pic upload): preconditions for MCP access and credential-grade operations — must never flow through AI tools.
+- **Admin surface** (user management, SMTP settings, backups, system stats): separate privilege domain from user PATs.
+- **Raw `save_month_data` exposure**: full-state overwrite is too dangerous as a model-callable tool; all writes go through validated single-purpose tools.
+- **Push/real-time and client-side features** (PDF export, charts): the client renders; MCP supplies the data.
+
+### Genuinely remaining
+
+- **Shared session store** — sessions are in-process memory with a documented single-gthread-worker constraint. Multi-replica/HA deployments need Redis (or sticky sessions) before horizontal scaling.

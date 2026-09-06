@@ -73,6 +73,8 @@
         </div>
         <div class="flex items-center gap-1 shrink-0">
             <button onclick="clearChat()" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-slate-500/10 transition-colors" title="Clear chat"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            <a href="{{ url_for('api_keys_page') }}" class="text-slate-400 hover:text-blue-500 p-1.5 rounded-lg hover:bg-slate-500/10 transition-colors" title="API Keys"><i data-lucide="key-round" class="w-4 h-4"></i></a>
+            <a href="{{ url_for('mcp_help_page') }}" class="text-slate-400 hover:text-blue-500 p-1.5 rounded-lg hover:bg-slate-500/10 transition-colors" title="MCP Help"><i data-lucide="book-open" class="w-4 h-4"></i></a>
             <button id="theme-toggle" class="text-slate-400 hover:text-blue-500 p-1.5 rounded-lg hover:bg-slate-500/10 transition-colors"><i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i></button>
         </div>
     </div>

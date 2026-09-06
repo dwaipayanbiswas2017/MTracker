@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>MCP Help - MTracker</title>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        brand: '#2563eb',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- JQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $.ajaxSetup({
+            headers: { 'X-CSRFToken': $('meta[name="csrf-token"]').attr('content') }
+        });
+    </script>
+
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-color: #0f172a;
+            --card-bg: #ffffff;
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-text: #0f172a;
+            --border-color: #e2e8f0;
+            --accent-color: #2563eb;
+            --code-bg: #f1f5f9;
+        }
+
+        .dark {
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+            --card-bg: #1e293b;
+            --input-bg: #1e293b;
+            --input-border: #334155;
+            --input-text: #f1f5f9;
+            --border-color: #334155;
+            --accent-color: #3b82f6;
+            --code-bg: #0f172a;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .code-block {
+            background-color: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.78rem;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        details.tool-group {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+
+        details.tool-group summary {
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            list-style: none;
+        }
+
+        details.tool-group summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.tool-group summary:hover {
+            background-color: rgba(37, 99, 235, 0.05);
+        }
+
+        details.tool-group .group-body {
+            border-top: 1px solid var(--border-color);
+            padding: 0.5rem 1rem 1rem;
+        }
+
+        .param-pill {
+            display: inline-block;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.72rem;
+            background-color: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 0.1rem 0.4rem;
+            margin: 0.1rem;
+        }
+
+        .tab-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem 0.5rem 0 0;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-color);
+            opacity: 0.6;
+        }
+
+        .tab-btn.active {
+            opacity: 1;
+            background-color: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 pb-20">
+
+    <!-- Header -->
+    <div class="mb-8 max-w-7xl mx-auto">
+        <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
+                <h1 class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
+            </div>
+
+            <div class="hidden md:flex gap-2 items-center">
+                <a href="{{ url_for('index') }}" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+
+                <a href="/chat" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-4 py-2 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="AI Assistant">
+                    <i data-lucide="bot" class="w-4 h-4"></i>
+                    <span class="font-medium">Chat</span>
+                </a>
+
+                <button id="theme-toggle" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5" title="Toggle Theme">
+                    <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
+                </button>
+
+                <!-- Profile Dropdown -->
+                <div class="relative" id="profile-dropdown-container">
+                    <button onclick="toggleProfileDropdown(event)" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-2 py-1 rounded flex items-center gap-2 h-10 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm active:translate-y-0.5">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500"
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
+                                 class="w-7 h-7 rounded-full object-cover border border-slate-300 dark:border-slate-500">
+                        {% endif %}
+                        <span class="font-medium mr-1">{{ current_user.name.split(' ')[0] if current_user.name else 'User' }}</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 opacity-50"></i>
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-500"></i>
+                            Dashboard
+                        </a>
+                        <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
+                            Profile Settings
+                        </a>
+                        <a href="{{ url_for('api_keys_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="key-round" class="w-4 h-4 text-violet-500"></i>
+                            API Keys
+                        </a>
+                        <a href="{{ url_for('mcp_help_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="book-open" class="w-4 h-4 text-emerald-500"></i>
+                            MCP Help
+                        </a>
+                        <a href="/chat" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
+                            AI Assistant
+                        </a>
+                        {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-orange-500"></i>
+                            Admin Panel
+                        </a>
+                        {% endif %}
+                        <div class="border-t border-slate-200 dark:border-slate-700 my-1"></div>
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Actions -->
+            <div class="flex md:hidden gap-2 items-center">
+                <button id="theme-toggle-mobile" class="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-white p-2.5 rounded transition-colors border border-slate-300 dark:border-slate-600 shadow-sm" title="Toggle Theme">
+                    <i id="theme-icon-mobile" data-lucide="sun" class="w-5 h-5"></i>
+                </button>
+                <div class="relative">
+                    <button onclick="toggleProfileDropdownMobile(event)" class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded transition-colors border border-blue-500">
+                        {% if current_user.profile_pic_path %}
+                            <img src="{{ url_for('static', filename=current_user.profile_pic_path.replace('static/', '')) }}"
+                                 class="w-8 h-8 rounded-full object-cover"
+                                 onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}'">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ current_user.name | urlencode }}"
+                                 class="w-8 h-8 rounded-full object-cover">
+                        {% endif %}
+                    </button>
+                    <!-- Mobile Dropdown Menu -->
+                    <div id="profile-dropdown-menu-mobile" class="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 hidden z-50">
+                        <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-500"></i>
+                            Dashboard
+                        </a>
+                        <a href="{{ url_for('profile') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="user" class="w-4 h-4 text-blue-500"></i>
+                            Profile
+                        </a>
+                        <a href="{{ url_for('api_keys_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="key-round" class="w-4 h-4 text-violet-500"></i>
+                            API Keys
+                        </a>
+                        <a href="{{ url_for('mcp_help_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="book-open" class="w-4 h-4 text-emerald-500"></i>
+                            MCP Help
+                        </a>
+                        <a href="/chat" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
+                            Chat
+                        </a>
+                        {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-orange-500"></i>
+                            Admin
+                        </a>
+                        {% endif %}
+                        <a href="/logout" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <div>
+            <h2 class="text-2xl font-bold flex items-center gap-2">
+                <i data-lucide="book-open" class="w-6 h-6 text-emerald-500"></i>
+                MCP Help
+            </h2>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">
+                Connect AI assistants like Claude Desktop to your MTracker data.
+                Server: <code class="px-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">{{ server_info.name }}/{{ server_info.version }}</code>
+                · Protocol <code class="px-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">{{ supported_versions|join(', ') }}</code> (negotiated)
+            </p>
+        </div>
+
+        <!-- Quickstart -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
+                <i data-lucide="rocket" class="w-5 h-5 text-blue-500"></i>
+                Quickstart — 3 steps
+            </h3>
+            <ol class="space-y-3 text-sm">
+                <li class="flex items-start gap-3">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
+                    <span><a href="{{ url_for('api_keys_page') }}" class="text-blue-500 hover:underline font-medium">Create an API key</a> on the API Keys page. Copy it immediately — it is shown only once.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                    <span>Paste it into your MCP client's configuration (examples below).</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">3</span>
+                    <span>Restart the client and ask about your finances — e.g. “How much did I spend last month?”</span>
+                </li>
+            </ol>
+        </div>
+
+        <!-- Endpoints -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
+                <i data-lucide="plug" class="w-5 h-5 text-violet-500"></i>
+                Connection endpoints
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm min-w-[560px]">
+                    <thead>
+                        <tr class="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                            <th class="py-2 pr-4 font-semibold">Endpoint</th>
+                            <th class="py-2 pr-4 font-semibold">Method</th>
+                            <th class="py-2 font-semibold">Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-slate-100 dark:border-slate-800">
+                            <td class="py-2 pr-4 font-mono text-xs break-all">{{ sse_url }}</td>
+                            <td class="py-2 pr-4">GET</td>
+                            <td class="py-2 text-slate-600 dark:text-slate-300">SSE stream (server → client)</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 pr-4 font-mono text-xs break-all">{{ messages_url }}</td>
+                            <td class="py-2 pr-4">POST</td>
+                            <td class="py-2 text-slate-600 dark:text-slate-300">JSON-RPC requests (client → server)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-sm text-slate-600 dark:text-slate-300 mt-3 flex items-start gap-2">
+                <i data-lucide="lock" class="w-4 h-4 mt-0.5 shrink-0 text-amber-500"></i>
+                <span>Both endpoints require the header <code class="px-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">Authorization: Bearer mt_live_…</code></span>
+            </p>
+        </div>
+
+        <!-- Scopes -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
+                <i data-lucide="shield-check" class="w-5 h-5 text-emerald-500"></i>
+                Key scopes
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm min-w-[560px]">
+                    <thead>
+                        <tr class="text-left text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                            <th class="py-2 pr-4 font-semibold">Scope</th>
+                            <th class="py-2 font-semibold">Allows</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-slate-100 dark:border-slate-800">
+                            <td class="py-2 pr-4 font-mono text-xs">read</td>
+                            <td class="py-2 text-slate-600 dark:text-slate-300">Read-only tools: summaries, month data, balances, lists, profile. Safe for analysis-only clients.</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 pr-4 font-mono text-xs">read_write</td>
+                            <td class="py-2 text-slate-600 dark:text-slate-300">Everything in <span class="font-mono">read</span>, plus creating expenses, transfers, debts, months, notes and profile updates.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Client setup -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
+                <i data-lucide="settings-2" class="w-5 h-5 text-blue-500"></i>
+                Client setup
+            </h3>
+            <div class="flex gap-1 border-b border-slate-200 dark:border-slate-700 mb-0">
+                <button class="tab-btn active" onclick="showSetupTab(event, 'tab-claude')">Claude Desktop</button>
+                <button class="tab-btn" onclick="showSetupTab(event, 'tab-vscode')">VSCode</button>
+                <button class="tab-btn" onclick="showSetupTab(event, 'tab-generic')">Generic SSE client</button>
+            </div>
+            <div id="tab-claude" class="setup-tab">
+                <div class="code-block rounded-t-none border-t-0" id="claude-config">{
+  "mcpServers": {
+    "mtracker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "{{ sse_url }}",
+        "--header",
+        "Authorization: Bearer mt_live_PASTE_YOUR_KEY_HERE"
+      ]
+    }
+  }
+}</div>
+                <button onclick="copyBlock('claude-config')" class="btn-primary mt-3">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    Copy config
+                </button>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">Config file: <span class="font-mono">claude_desktop_config.json</span>. Requires Node.js (<span class="font-mono">npx</span>) — the <span class="font-mono">mcp-remote</span> wrapper bridges Claude Desktop to this SSE server. Restart Claude Desktop after saving.</p>
+            </div>
+            <div id="tab-vscode" class="setup-tab hidden">
+                <div class="code-block rounded-t-none border-t-0" id="vscode-config">{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "mtracker-pat",
+      "description": "MTracker Personal Access Token (starts with mt_live_)",
+      "password": true
+    }
+  ],
+  "servers": {
+    "mtracker": {
+      "type": "sse",
+      "url": "{{ sse_url }}",
+      "headers": {
+        "Authorization": "Bearer ${input:mtracker-pat}"
+      }
+    }
+  }
+}</div>
+                <button onclick="copyBlock('vscode-config')" class="btn-primary mt-3">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    Copy config
+                </button>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">File: <span class="font-mono">.vscode/mcp.json</span> in your workspace. VSCode prompts once and stores the key in the OS credential store — never hard-code the raw key here. Then run <span class="font-mono">MCP: List Servers</span> → start <span class="font-mono">mtracker</span>.</p>
+            </div>
+            <div id="tab-generic" class="setup-tab hidden">
+                <div class="code-block rounded-t-none border-t-0" id="generic-config">SSE endpoint : {{ sse_url }}
+Messages URL : {{ messages_url }}
+Auth header  : Authorization: Bearer mt_live_PASTE_YOUR_KEY_HERE
+Protocol     : JSON-RPC 2.0 over SSE (MCP {{ supported_versions|join(', ') }}, negotiated)</div>
+                <button onclick="copyBlock('generic-config')" class="btn-primary mt-3">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    Copy details
+                </button>
+            </div>
+        </div>
+
+        <!-- Tools reference -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-1">
+                <i data-lucide="wrench" class="w-5 h-5 text-orange-500"></i>
+                Tools reference
+            </h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">{{ tool_count }} tools, rendered from the live server registry. Required parameters are marked <span class="text-rose-500 font-bold">*</span>.</p>
+            <div class="space-y-3">
+                {% for group_title, group_tools in grouped_tools %}
+                <details class="tool-group" {% if loop.first %}open{% endif %}>
+                    <summary>
+                        <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+                        {{ group_title }}
+                        <span class="text-xs font-normal text-slate-400">({{ group_tools|length }})</span>
+                    </summary>
+                    <div class="group-body space-y-4">
+                        {% for tool in group_tools %}
+                        <div>
+                            <div class="font-mono text-sm font-bold text-blue-600 dark:text-blue-400">{{ tool.name }}</div>
+                            <p class="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{{ tool.description }}</p>
+                            <div class="mt-1">
+                                {% for pname, pmeta in tool.inputSchema.get('properties', {}).items() %}
+                                <span class="param-pill">{{ pname }}: {{ pmeta.get('type', 'string') }}{% if pname in tool.inputSchema.get('required', []) %}<span class="text-rose-500 font-bold">*</span>{% endif %}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Resources -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
+                <i data-lucide="database" class="w-5 h-5 text-emerald-500"></i>
+                Resources
+            </h3>
+            <div class="space-y-2">
+                {% for r in resources %}
+                <div class="flex items-start gap-3 text-sm">
+                    <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs shrink-0">{{ r.uri }}</code>
+                    <span class="text-slate-600 dark:text-slate-300">{{ r.description }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Troubleshooting -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
+                <i data-lucide="life-buoy" class="w-5 h-5 text-rose-500"></i>
+                Troubleshooting
+            </h3>
+            <div class="space-y-3 text-sm">
+                <details class="tool-group">
+                    <summary><i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i> Connected but no tools listed</summary>
+                    <div class="group-body text-slate-600 dark:text-slate-300">This happens when the client and server cannot agree on a protocol version. The server negotiates across <span class="font-mono">{{ supported_versions|join(', ') }}</span> — make sure you deployed the latest server code, then restart/reconnect the client (in VSCode: "MCP: List Servers" → restart).</div>
+                </details>
+                <details class="tool-group">
+                    <summary><i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i> 401 Unauthorized</summary>
+                    <div class="group-body text-slate-600 dark:text-slate-300">The key is missing, mistyped, revoked, or expired. Check the <span class="font-mono">Authorization: Bearer …</span> header and create a fresh key on the <a href="{{ url_for('api_keys_page') }}" class="text-blue-500 hover:underline">API Keys page</a>.</div>
+                </details>
+                <details class="tool-group">
+                    <summary><i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i> "Read-only token cannot perform write operations"</summary>
+                    <div class="group-body text-slate-600 dark:text-slate-300">Your key has the <span class="font-mono">read</span> scope. Create a <span class="font-mono">read_write</span> key for actions that modify data.</div>
+                </details>
+                <details class="tool-group">
+                    <summary><i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i> SSE stream disconnects</summary>
+                    <div class="group-body text-slate-600 dark:text-slate-300">Reconnect the client — each connection gets a fresh session. Stale server-side sessions are cleaned up after 5 minutes.</div>
+                </details>
+                <details class="tool-group">
+                    <summary><i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i> I lost my key</summary>
+                    <div class="group-body text-slate-600 dark:text-slate-300">Keys are shown once and cannot be recovered. Revoke the old key and generate a new one.</div>
+                </details>
+            </div>
+        </div>
+
+        <!-- Security -->
+        <div class="card p-6">
+            <h3 class="text-lg font-bold flex items-center gap-2 mb-3">
+                <i data-lucide="lock" class="w-5 h-5 text-amber-500"></i>
+                Security best practices
+            </h3>
+            <ul class="text-sm text-slate-600 dark:text-slate-300 space-y-2 list-disc list-inside">
+                <li>Prefer the <span class="font-mono">read</span> scope unless the client must write data.</li>
+                <li>Never share keys or commit them to code repositories.</li>
+                <li>Revoke keys you no longer use — revocation takes effect immediately.</li>
+                <li>If a key leaks, revoke it and generate a replacement.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Message Toast -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl opacity-0 transition-opacity pointer-events-none z-[100] border border-slate-700">
+        <span id="toastMsg"></span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-12 pt-10 border-t border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-sm max-w-6xl mx-auto px-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+            <div class="col-span-1 md:col-span-2 space-y-4">
+                <div class="flex items-center gap-2 text-slate-900 dark:text-slate-200">
+                    <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                        <i data-lucide="wallet" class="w-5 h-5"></i>
+                    </div>
+                    <span class="font-bold text-lg">MTracker</span>
+                </div>
+                <p class="max-w-md">The modern approach to managing your personal finances. Track every penny, analyze your spending, and achieve your financial goals with ease.</p>
+                <div class="flex gap-4">
+                    <a href="https://github.com/dwaipayanbiswas2017/MTracker" target="_blank" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white" title="GitHub Repository">
+                        <i data-lucide="github" class="w-5 h-5"></i>
+                    </a>
+                    <a href="mailto:support@mtracker.com" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-blue-600 transition-all text-slate-600 dark:text-slate-200 hover:text-white" title="Contact Support">
+                        <i data-lucide="mail" class="w-5 h-5"></i>
+                    </a>
+                </div>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Navigation</h4>
+                <ul class="space-y-3">
+                    <li><a href="{{ url_for('index') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard</a></li>
+                    <li><a href="{{ url_for('profile') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="user-cog" class="w-4 h-4"></i> Profile Settings</a></li>
+                    <li><a href="{{ url_for('api_keys_page') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4"></i> API Keys</a></li>
+                    <li><a href="{{ url_for('mcp_help_page') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> MCP Help</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Resources</h4>
+                <ul class="space-y-3">
+                    <li><a href="#" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> Documentation</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Privacy Policy</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="text-center py-6 border-t border-slate-200 dark:border-slate-800 opacity-60">
+            &copy; 2026 MTracker Systems. All rights reserved. Built for private financial tracking.
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        function showToast(message, isError = false) {
+            const toast = $('#toast');
+            $('#toastMsg').text(message);
+            if (isError) toast.addClass('bg-rose-600').removeClass('bg-slate-800');
+            else toast.removeClass('bg-rose-600').addClass('bg-slate-800');
+            toast.removeClass('opacity-0').addClass('opacity-100');
+            setTimeout(() => {
+                toast.removeClass('opacity-100').addClass('opacity-0');
+            }, 3000);
+        }
+
+        // --- Theme ---
+        function toggleTheme() {
+            const html = $('html');
+            const icons = $('#theme-icon, #theme-icon-mobile');
+            if (html.hasClass('dark')) {
+                html.removeClass('dark');
+                localStorage.setItem('theme', 'light');
+                icons.attr('data-lucide', 'sun');
+            } else {
+                html.addClass('dark');
+                localStorage.setItem('theme', 'dark');
+                icons.attr('data-lucide', 'moon');
+            }
+            lucide.createIcons();
+        }
+
+        $('#theme-toggle, #theme-toggle-mobile').click(toggleTheme);
+
+        function toggleProfileDropdown(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu').toggleClass('hidden');
+        }
+
+        function toggleProfileDropdownMobile(e) {
+            e.stopPropagation();
+            $('#profile-dropdown-menu-mobile').toggleClass('hidden');
+        }
+
+        $(document).click(function() {
+            $('#profile-dropdown-menu').addClass('hidden');
+            $('#profile-dropdown-menu-mobile').addClass('hidden');
+        });
+
+        // --- Setup tabs ---
+        function showSetupTab(e, id) {
+            e.preventDefault();
+            $('.tab-btn').removeClass('active');
+            $(e.currentTarget).addClass('active');
+            $('.setup-tab').addClass('hidden');
+            $('#' + id).removeClass('hidden');
+        }
+
+        function copyBlock(id) {
+            const text = document.getElementById(id).innerText;
+            const done = function() { showToast('Copied to clipboard'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done, function() { showToast('Copy failed — select the text manually', true); });
+            } else {
+                showToast('Copy not supported — select the text manually', true);
+            }
+        }
+
+        // --- Init ---
+        if (localStorage.getItem('theme') === 'light') {
+            $('html').removeClass('dark');
+            $('#theme-icon').attr('data-lucide', 'sun');
+            lucide.createIcons();
+        }
+    </script>
+{% include 'chat_widget.html' %}
+</body>
+</html>

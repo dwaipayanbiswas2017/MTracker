@@ -181,6 +181,14 @@
                             <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
                             AI Assistant
                         </a>
+                        <a href="{{ url_for('api_keys_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="key-round" class="w-4 h-4 text-violet-500"></i>
+                            API Keys
+                        </a>
+                        <a href="{{ url_for('mcp_help_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="book-open" class="w-4 h-4 text-emerald-500"></i>
+                            MCP Help
+                        </a>
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="shield-check" class="w-4 h-4 text-orange-500"></i>
@@ -221,6 +229,14 @@
                         <a href="/chat" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="bot" class="w-4 h-4 text-emerald-500"></i>
                             Chat
+                        </a>
+                        <a href="{{ url_for('api_keys_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="key-round" class="w-4 h-4 text-violet-500"></i>
+                            API Keys
+                        </a>
+                        <a href="{{ url_for('mcp_help_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="book-open" class="w-4 h-4 text-emerald-500"></i>
+                            MCP Help
                         </a>
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -481,6 +497,8 @@
                 <ul class="space-y-3">
                     <li><a href="{{ url_for('index') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard</a></li>
                     <li><a href="{{ url_for('profile') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="user-cog" class="w-4 h-4"></i> Profile Settings</a></li>
+                    <li><a href="{{ url_for('api_keys_page') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4"></i> API Keys</a></li>
+                    <li><a href="{{ url_for('mcp_help_page') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> MCP Help</a></li>
                 </ul>
             </div>
             <div>

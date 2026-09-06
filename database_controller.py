@@ -801,10 +801,11 @@ class DatabaseController:
 
     # --- Personal Access Tokens (MCP Auth) ---
 
-    def create_pat(self, user_id, name, scope='read_write'):
+    def create_pat(self, user_id, name, scope='read_write', expires_at=None):
         """
         Creates a new Personal Access Token for a user.
         Returns the token_id and the raw token value (to show once).
+        :param expires_at: Optional expiry as 'YYYY-MM-DD HH:MM:SS' (None = never expires).
         """
         import hashlib, secrets, time
         conn = self.get_connection()
@@ -817,11 +818,11 @@ class DatabaseController:
             row = cursor.fetchone()
             token_id = f"{user_id}_pat{row['cnt'] + 1}"
             cursor.execute("""
-                INSERT INTO personal_access_tokens (id, user_id, token_hash, name, scope)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (token_id, user_id, token_hash, name, scope))
+                INSERT INTO personal_access_tokens (id, user_id, token_hash, name, scope, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (token_id, user_id, token_hash, name, scope, expires_at))
             conn.commit()
-            return {"id": token_id, "token": token_value, "name": name, "scope": scope}
+            return {"id": token_id, "token": token_value, "name": name, "scope": scope, "expires_at": expires_at}
         except Exception as e:
             print(f"Error creating PAT: {e}")
             return None

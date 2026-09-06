@@ -18,7 +18,9 @@ MTracker is a professional personal finance management application designed to h
 -   **Admin Panel & System Settings**: Global oversight with user management, system-wide SMTP configuration, and database backup management via a dedicated dashboard.
 -   **Database Backup & Restore**: Create manual backups, schedule automatic daily backups (configurable time), restore from any backup file, download backups, and email backup files to admin users — all from the admin panel.
 -   **AI Assistant**: Built-in AI chat assistant (floating chat widget) powered by NVIDIA AI models that answers questions about your financial data using natural language.
--   **MCP Server**: Model Context Protocol (MCP) server with 25 tools and PAT-based authentication for AI agent integration.
+-   **MCP Server (v1.1.0)**: Model Context Protocol (MCP) server with 16 grouped tools (`manage_*` with `action` verbs) and PAT-based authentication. `mcp_server.py` is the single source of truth for all tools — both the Pydantic AI chat agent (in-process MCP) and over-the-wire MCP clients (SSE: Claude Desktop via `mcp-remote`, VSCode, generic clients) consume the same registry. `month_key` defaults to the current month; `read`-scoped tokens are limited to per-action read operations.
+-   **API Keys Page**: Self-service Personal Access Token management at `/api-keys` — create (including expiry), list, and revoke tokens from the UI.
+-   **MCP Help Page**: Setup guide with copy-paste client configs plus a live tool/resource reference rendered from the server registry at `/mcp-help`.
 -   **Modern Dynamic UI**: Clean, tactile interface with a consistent theme engine supporting Light and Dark modes. Password visibility toggle on login/register.
 -   **Secure Authentication**: Role-based access control with secure password hashing and dual-identifier (Email/Phone) login.
 
@@ -30,7 +32,7 @@ MTracker is a professional personal finance management application designed to h
 -   **`/logout`**: Session termination (GET).
 -   **`/forgot_password`**: Password recovery initiation (GET).
 -   **`/api/forgot_password/send`**: Send OTP for password reset (POST).
--   **`/api/forgot_password/verify`**: Verify OTP and update password (POST).
+-   **`/api/forgot_password/reset`**: Verify OTP and update password (POST).
 -   **`/api/verify_password`**: Internal identity verification (POST).
 -   **`/api/send_otp`**: OTP generation for contact updates or security (POST).
 -   **`/api/verify_otp`**: OTP verification for sensitive profile changes (POST).
@@ -55,13 +57,37 @@ MTracker is a professional personal finance management application designed to h
 
 ### AI Assistant
 -   **`/api/chat`**: Send a natural language query about your finances and get an AI-generated response (POST).
--   **`/api/models`**: List available AI models for the chat assistant (GET).
 
 ### MCP Server (Model Context Protocol)
+-   **`/api-keys`**: Self-service API key management page — create, list, and revoke Personal Access Tokens (GET).
+-   **`/mcp-help`**: MCP setup guide and live tool/resource reference for users (GET).
 -   **`/api/mcp/sse`**: SSE stream endpoint for MCP client connections (GET).
 -   **`/api/mcp/messages`**: JSON-RPC message endpoint for MCP client requests (POST).
--   **`/api/mcp/tokens`**: Create and list Personal Access Tokens for MCP auth (GET/POST).
+-   **`/api/mcp/tokens`**: Create (accepts optional `expires_in_days`) and list Personal Access Tokens for MCP auth (GET/POST).
 -   **`/api/mcp/tokens/<pat_id>`**: Revoke a Personal Access Token (DELETE).
+
+### MCP Tools (v1.1.0)
+
+Grouped by entity — each `manage_*` tool takes an `action` verb (only `action` is schema-required; per-action fields are validated at runtime). `month_key` defaults to the current month everywhere except `manage_months/delete`, which requires it explicitly. `R` marks actions available to `read`-scoped tokens.
+
+| Tool | Actions | Description |
+|---|---|---|
+| `get_summary` | — (R) | Monthly totals: income, expenses, balances, counts. |
+| `get_month_data` | — (R) | Full month state, with optional `sections` filter. |
+| `get_account_balances` | — (R) | Per-account running balances. |
+| `get_last_expense_date` | — (R) | Latest expense with date, amount, reason, category, account. |
+| `manage_expenses` | `add_paid`, `add_daily`, `update`, `delete` | Regular + daily spends, in-place edits (linked entries blocked), cascade-aware deletes. |
+| `manage_income` | `add`, `update`, `delete` | Income entries; delete cascades linked transfer expenses. |
+| `manage_pending` | `add`, `list` (R), `delete` | Planned/unpaid budget items. |
+| `manage_accounts` | `list` (R), `add`, `update`, `set_opening_balance` | Accounts incl. per-account opening balances. |
+| `manage_categories` | `list` (R), `add`, `update` | Expense/income categories. |
+| `manage_debts` | `list` (R), `add`, `update`, `delete`, `pay` | Debts/loans with partial payments linked to a month. |
+| `manage_months` | `list` (R), `create`, `delete` | Month lifecycle (`copy_pending` supported; delete is irreversible). |
+| `manage_notes` | `add`, `list` (R), `delete` | Month notes (delete + re-add to change). |
+| `manage_profile` | `get` (R), `update` | Name, currency, default account (name or ID). |
+| `manage_tokens` | `list` (R), `revoke` | Token metadata + revocation (creation is web-UI-only). |
+| `transfer_funds` | — | Linked expense + income pair between accounts. |
+| `import_bulk` | — | CSV import via pasted `csv_text` or server-side `file_path`. |
 
 ### Administration & Settings
 -   **`/admin`**: Global dashboard overview for system administrators (GET).
@@ -103,6 +129,8 @@ MTracker is a professional personal finance management application designed to h
     user=your_db_user
     password=your_db_password
     database=mtracker
+    NVIDIA_API_KEY=your_nvidia_key_here
+    FLASK_SECRET_KEY=your_random_secret_here
     ```
 
 3.  **Install dependencies**:
@@ -121,10 +149,31 @@ MTracker is a professional personal finance management application designed to h
     ```bash
     python app.py
     ```
-    For production, use Gunicorn:
+    For production, use Gunicorn with a **single gthread worker** (required: MCP SSE sessions live in process memory, so multiple sync workers break MCP clients):
     ```bash
-    gunicorn --workers 3 --timeout 120 --bind 0.0.0.0:5000 app:app
+    gunicorn --bind 0.0.0.0:80 --worker-class gthread --workers 1 --threads 16 --timeout 300 app:app
     ```
+
+## Docker Deployment (Recommended)
+
+The app ships with a `Dockerfile` and `docker-compose.yml` (host networking so the container reaches MySQL on the host; persistent volumes for profile pictures and backups):
+
+```bash
+sudo docker compose up -d --build
+```
+
+### `deploy.sh` — rebuild, redeploy, verify
+
+`deploy.sh` automates the full rollout: rebuilds the image, redeploys the service, waits for readiness, and verifies the new code is live:
+
+```bash
+./deploy.sh                # rebuild + redeploy + verify (default)
+./deploy.sh --no-build     # restart only, no rebuild
+./deploy.sh --logs         # follow logs after a successful deploy
+./deploy.sh --timeout 120  # seconds to wait for readiness (default 90)
+```
+
+Verification checks: `200` on `/login`, `401` on `/api/mcp/sse` (auth gate = MCP code serving), `302` on `/api-keys` and `/mcp-help` (login redirect = routes registered). Always redeploy with `./deploy.sh` (not a plain restart) after changing Python code or templates, since both are baked into the image.
 
 ## Production Deployment (Auto-start on Boot)
 
@@ -157,6 +206,8 @@ To ensure MTracker starts automatically on boot, a `systemd` service is provided
     ```bash
     systemctl --user status mtracker.service
     ```
+
+> **Note:** `mtracker.service` runs stock Gunicorn defaults. For MCP SSE to work under systemd, its `ExecStart` must use the same single-gthread-worker flags as the `Dockerfile` (`--worker-class gthread --workers 1 --threads 16`). The Docker deployment above already does this and is the recommended production path.
 
 ## Initial Configuration
     - Visit `http://localhost:5000` to register.

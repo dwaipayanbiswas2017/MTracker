@@ -1,11 +1,12 @@
 import csv
 import io
+import json
 import secrets
 import time
 import threading
 import logging
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session, Response
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -537,7 +538,7 @@ def chat_api():
 
     t0 = time.time()
     try:
-        reply = get_response(message, user_id=current_user.id, db=db)
+        reply = get_response(message, user_id=current_user.id, mcp_server=mcp_server, db=db)
         elapsed = time.time() - t0
         app.logger.info(f"Chat OK user={current_user.id} elapsed={elapsed:.1f}s len={len(reply)}")
         return jsonify({"reply": reply})
@@ -1306,7 +1307,7 @@ def verify_password():
 #  MCP (Model Context Protocol) Server
 # ─────────────────────────────────────────────────────────
 
-from mcp_server import MTrackerMCPServer, sessions
+from mcp_server import MTrackerMCPServer, sessions, PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS
 import uuid
 
 mcp_server = MTrackerMCPServer(db)
@@ -1353,7 +1354,12 @@ def mcp_sse():
         finally:
             sessions.remove(session_id)
 
-    return Response(event_stream(), mimetype='text/event-stream')
+    response = Response(event_stream(), mimetype='text/event-stream')
+    # Prevent TLS/CDN proxies from buffering or closing the idle stream.
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Connection'] = 'keep-alive'
+    response.headers['X-Accel-Buffering'] = 'no'
+    return response
 
 
 @app.route('/api/mcp/messages', methods=['POST'])
@@ -1385,24 +1391,97 @@ def mcp_messages():
             session.add_response(resp)
         return jsonify({"status": "queued"})
     else:
-        # No session: return response directly
+        # No session: return response directly. A session_id that misses here
+        # means the SSE stream lives in another worker process — the server
+        # must run as a single gthread worker (see Dockerfile) or the client
+        # will wait on its stream forever.
+        if session_id:
+            app.logger.warning(f"MCP session miss for session_id={session_id[:8]}…; returning inline response")
         responses = mcp_server.dispatch(message, user_id, user_name, scope)
         if len(responses) == 1:
             return jsonify(responses[0])
         return jsonify(responses)
 
 
+@app.route('/api-keys')
+@login_required
+def api_keys_page():
+    """Self-service API key (PAT) management page."""
+    return render_template('api_keys.html', name=current_user.name, user=current_user)
+
+
+@app.route('/mcp-help')
+@login_required
+def mcp_help_page():
+    """MCP setup and reference help page (rendered from the live tool registry)."""
+    tools = mcp_server.list_tools()["tools"]
+    resources = mcp_server._list_resources(current_user.id)["resources"]
+    groups = [
+        ("Financial data", ["get_summary", "get_month_data", "get_account_balances", "get_last_expense_date"]),
+        ("Expenses", ["manage_expenses"]),
+        ("Income", ["manage_income"]),
+        ("Budget", ["manage_pending"]),
+        ("Transfers & Import", ["transfer_funds", "import_bulk"]),
+        ("Accounts", ["manage_accounts"]),
+        ("Categories", ["manage_categories"]),
+        ("Debts & Loans", ["manage_debts"]),
+        ("Months", ["manage_months"]),
+        ("Notes", ["manage_notes"]),
+        ("Profile", ["manage_profile"]),
+        ("API Tokens", ["manage_tokens"]),
+    ]
+    by_name = {t["name"]: t for t in tools}
+    grouped_tools = [(title, [by_name[n] for n in names if n in by_name]) for title, names in groups]
+    return render_template(
+        'mcp_help.html',
+        name=current_user.name,
+        user=current_user,
+        grouped_tools=grouped_tools,
+        tool_count=len(tools),
+        resources=resources,
+        protocol_version=PROTOCOL_VERSION,
+        supported_versions=SUPPORTED_PROTOCOL_VERSIONS,
+        server_info={"name": "mtracker", "version": "1.1.0"},
+        sse_url=url_for('mcp_sse', _external=True),
+        messages_url=url_for('mcp_messages', _external=True),
+    )
+
+
+MAX_PATS_PER_USER = 10
+
+
 @app.route('/api/mcp/tokens', methods=['POST'])
 @login_required
 def mcp_create_token():
     """Create a new Personal Access Token for the current user."""
-    name = request.json.get("name", "MCP Token")
-    scope = request.json.get("scope", "read_write")
+    data = request.get_json(silent=True)
+    if data is None:
+        if request.content_length:
+            return jsonify({"error": "Request body must be JSON."}), 400
+        data = {}
+    name = (data.get("name") or "MCP Token").strip()
+    scope = data.get("scope", "read_write")
+    if not name:
+        return jsonify({"error": "Token name is required."}), 400
+    if len(name) > 64:
+        return jsonify({"error": "Token name must be 64 characters or fewer."}), 400
     if scope not in ("read", "read_write"):
         return jsonify({"error": "Scope must be 'read' or 'read_write'"}), 400
-    result = db.create_pat(current_user.id, name, scope)
+    expires_at = None
+    if data.get("expires_in_days") is not None:
+        try:
+            days = int(data.get("expires_in_days"))
+            if days <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": "expires_in_days must be a positive integer."}), 400
+        expires_at = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    existing = db.list_pats(current_user.id) or []
+    if len(existing) >= MAX_PATS_PER_USER:
+        return jsonify({"error": f"Token limit reached ({MAX_PATS_PER_USER}). Revoke an unused token first."}), 400
+    result = db.create_pat(current_user.id, name, scope, expires_at=expires_at)
     if result:
-        return jsonify({"status": "success", "token": result["token"], "id": result["id"], "name": result["name"], "scope": result["scope"]})
+        return jsonify({"status": "success", "token": result["token"], "id": result["id"], "name": result["name"], "scope": result["scope"], "expires_at": result.get("expires_at")})
     return jsonify({"error": "Failed to create token"}), 500
 
 
