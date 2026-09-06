@@ -63,10 +63,12 @@ Bearer PAT in the `Authorization` header of **both** the SSE request and every m
 
 ```http
 GET /api/mcp/sse HTTP/1.1
-Host: mtracker.example.com
+Host: mtracker.in
 Authorization: Bearer mt_live_abc123…
 Accept: text/event-stream
 ```
+
+Production base URL: `https://mtracker.in` (SSE stream at `https://mtracker.in/api/mcp/sse`). The `/mcp-help` page renders client configs with the deployment's real URLs — copy them from there.
 
 - **Format:** `mt_live_` + 64 hex chars. Only the SHA-256 hash is stored (`personal_access_tokens.token_hash`); the raw value is shown once at creation.
 - **Validation** (`db.validate_pat`): prefix check → hash lookup → must be unrevoked, unexpired, and belong to an active user. Returns `{user_id, user_name, scope}`.

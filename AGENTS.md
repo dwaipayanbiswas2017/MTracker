@@ -3,6 +3,7 @@
 ## Quickstart
 
 - **Run the Flask app**: `python app.py` (0.0.0.0:5000)
+- **Production**: `https://mtracker.in` (Docker, host networking, port 80)
 - **Run the AI agent CLI**: `python agent.py`
 - **Docker**: `sudo docker compose up` (host networking, port 80)
 - **Deploy (rebuild + verify)**: `./deploy.sh` (see `README.md` → Docker Deployment)

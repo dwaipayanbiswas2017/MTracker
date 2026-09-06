@@ -2,6 +2,8 @@
 
 MTracker is a professional personal finance management application designed to help you track your income, expenses, and budget across multiple bank accounts.
 
+**Live at [`https://mtracker.in`](https://mtracker.in)**
+
 ## Features
 
 -   **Multi-Account Support**: Track expenses and income for different accounts (e.g., Cash, Bank, Credit Card) with an All/Default view toggle.
@@ -59,6 +61,9 @@ MTracker is a professional personal finance management application designed to h
 -   **`/api/chat`**: Send a natural language query about your finances and get an AI-generated response (POST).
 
 ### MCP Server (Model Context Protocol)
+
+Production base URL: `https://mtracker.in` (e.g. SSE stream at `https://mtracker.in/api/mcp/sse`).
+
 -   **`/api-keys`**: Self-service API key management page — create, list, and revoke Personal Access Tokens (GET).
 -   **`/mcp-help`**: MCP setup guide and live tool/resource reference for users (GET).
 -   **`/api/mcp/sse`**: SSE stream endpoint for MCP client connections (GET).
@@ -210,7 +215,7 @@ To ensure MTracker starts automatically on boot, a `systemd` service is provided
 > **Note:** `mtracker.service` runs stock Gunicorn defaults. For MCP SSE to work under systemd, its `ExecStart` must use the same single-gthread-worker flags as the `Dockerfile` (`--worker-class gthread --workers 1 --threads 16`). The Docker deployment above already does this and is the recommended production path.
 
 ## Initial Configuration
-    - Visit `http://localhost:5000` to register.
+    - Visit `https://mtracker.in` to register (or `http://localhost:5000` when running locally).
     - If you are an admin, configure SMTP settings in the Admin Panel to enable email features like OTP and Password Recovery.
     - For the AI Assistant to work, set your NVIDIA AI API key in the `.env` file: `NVIDIA_API_KEY=your_key_here`.
 
