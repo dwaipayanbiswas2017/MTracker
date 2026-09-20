@@ -346,6 +346,11 @@
                     </thead>
                     <tbody>
                         <tr class="border-b border-slate-100 dark:border-slate-800">
+                            <td class="py-2 pr-4 font-mono text-xs break-all">{{ streamable_http_url }}</td>
+                            <td class="py-2 pr-4">GET + POST</td>
+                            <td class="py-2 text-slate-600 dark:text-slate-300">Streamable HTTP (single-endpoint transport — use this for Claude web)</td>
+                        </tr>
+                        <tr class="border-b border-slate-100 dark:border-slate-800">
                             <td class="py-2 pr-4 font-mono text-xs break-all">{{ sse_url }}</td>
                             <td class="py-2 pr-4">GET</td>
                             <td class="py-2 text-slate-600 dark:text-slate-300">SSE stream (server → client)</td>
@@ -360,7 +365,7 @@
             </div>
             <p class="text-sm text-slate-600 dark:text-slate-300 mt-3 flex items-start gap-2">
                 <i data-lucide="lock" class="w-4 h-4 mt-0.5 shrink-0 text-amber-500"></i>
-                <span>Both endpoints require the header <code class="px-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">Authorization: Bearer mt_live_…</code></span>
+                <span>Authenticate with a bearer header <code class="px-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">Authorization: Bearer mt_live_…</code> or, if a client can't send headers, append <code class="px-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-xs">?token=mt_live_…</code> to the URL.</span>
             </p>
         </div>
 
@@ -399,11 +404,22 @@
                 Client setup
             </h3>
             <div class="flex gap-1 border-b border-slate-200 dark:border-slate-700 mb-0">
-                <button class="tab-btn active" onclick="showSetupTab(event, 'tab-claude')">Claude Desktop</button>
+                <button class="tab-btn active" onclick="showSetupTab(event, 'tab-web')">Claude web</button>
+                <button class="tab-btn" onclick="showSetupTab(event, 'tab-claude')">Claude Desktop</button>
                 <button class="tab-btn" onclick="showSetupTab(event, 'tab-vscode')">VSCode</button>
-                <button class="tab-btn" onclick="showSetupTab(event, 'tab-generic')">Generic SSE client</button>
+                <button class="tab-btn" onclick="showSetupTab(event, 'tab-generic')">Generic client</button>
             </div>
-            <div id="tab-claude" class="setup-tab">
+            <div id="tab-web" class="setup-tab">
+                <div class="code-block rounded-t-none border-t-0" id="web-config">MCP URL : {{ streamable_http_url }}?token=mt_live_PASTE_YOUR_KEY_HERE
+Transport : Streamable HTTP
+Auth     : No sign-in (token is in the URL — headers not supported by Claude web)</div>
+                <button onclick="copyBlock('web-config')" class="btn-primary mt-3">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    Copy config
+                </button>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">In Claude web: Settings → Connectors → Add custom connector. Name it <span class="font-mono">mtracker</span>, paste the URL above (with your real token), pick <span class="font-mono">No sign-in</span> as authentication, and ensure Advanced → Transport is <span class="font-mono">Streamable HTTP</span>. The token travels in the URL since Claude web can't send custom auth headers.</p>
+            </div>
+            <div id="tab-claude" class="setup-tab hidden">
                 <div class="code-block rounded-t-none border-t-0" id="claude-config">{
   "mcpServers": {
     "mtracker": {
@@ -411,7 +427,7 @@
       "args": [
         "-y",
         "mcp-remote",
-        "{{ sse_url }}",
+        "{{ streamable_http_url }}",
         "--header",
         "Authorization: Bearer mt_live_PASTE_YOUR_KEY_HERE"
       ]
@@ -422,7 +438,7 @@
                     <i data-lucide="copy" class="w-4 h-4"></i>
                     Copy config
                 </button>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">Config file: <span class="font-mono">claude_desktop_config.json</span>. Requires Node.js (<span class="font-mono">npx</span>) — the <span class="font-mono">mcp-remote</span> wrapper bridges Claude Desktop to this SSE server. Restart Claude Desktop after saving.</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">Config file: <span class="font-mono">claude_desktop_config.json</span>. Requires Node.js (<span class="font-mono">npx</span>) — the <span class="font-mono">mcp-remote</span> wrapper bridges Claude Desktop to this streamable HTTP server. Restart Claude Desktop after saving.</p>
             </div>
             <div id="tab-vscode" class="setup-tab hidden">
                 <div class="code-block rounded-t-none border-t-0" id="vscode-config">{
@@ -436,8 +452,8 @@
   ],
   "servers": {
     "mtracker": {
-      "type": "sse",
-      "url": "{{ sse_url }}",
+      "type": "streamable-http",
+      "url": "{{ streamable_http_url }}",
       "headers": {
         "Authorization": "Bearer ${input:mtracker-pat}"
       }
@@ -451,10 +467,10 @@
                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">File: <span class="font-mono">.vscode/mcp.json</span> in your workspace. VSCode prompts once and stores the key in the OS credential store — never hard-code the raw key here. Then run <span class="font-mono">MCP: List Servers</span> → start <span class="font-mono">mtracker</span>.</p>
             </div>
             <div id="tab-generic" class="setup-tab hidden">
-                <div class="code-block rounded-t-none border-t-0" id="generic-config">SSE endpoint : {{ sse_url }}
+                <div class="code-block rounded-t-none border-t-0" id="generic-config">Streamable HTTP endpoint : {{ streamable_http_url }}
 Messages URL : {{ messages_url }}
-Auth header  : Authorization: Bearer mt_live_PASTE_YOUR_KEY_HERE
-Protocol     : JSON-RPC 2.0 over SSE (MCP {{ supported_versions|join(', ') }}, negotiated)</div>
+Auth header  : Authorization: Bearer mt_live_PASTE_YOUR_KEY_HERE (or ?token=… in the URL)
+Protocol     : JSON-RPC 2.0 over streamable HTTP (MCP {{ supported_versions|join(', ') }}, negotiated)</div>
                 <button onclick="copyBlock('generic-config')" class="btn-primary mt-3">
                     <i data-lucide="copy" class="w-4 h-4"></i>
                     Copy details

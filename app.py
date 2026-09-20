@@ -1313,11 +1313,22 @@ import uuid
 mcp_server = MTrackerMCPServer(db)
 
 def _mcp_authenticate():
-    """Validate Bearer token from Authorization header. Returns user info dict or None."""
+    """Validate the MCP caller's personal access token (PAT).
+
+    Accepts the token from either:
+      - the ``Authorization: Bearer <token>`` header (SSE/web-key clients), or
+      - the ``?token=<token>`` query parameter (for clients that cannot send
+        custom headers, e.g. Claude web custom connectors without the
+        Request-headers beta).
+    Returns the user info dict or None.
+    """
     auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
+    if auth.startswith("Bearer "):
+        token = auth[7:]
+    else:
+        token = request.args.get("token", "")
+    if not token:
         return None
-    token = auth[7:]
     result = db.validate_pat(token)
     if result:
         db.update_pat_last_used(token)
@@ -1360,6 +1371,65 @@ def mcp_sse():
     response.headers['Connection'] = 'keep-alive'
     response.headers['X-Accel-Buffering'] = 'no'
     return response
+
+
+@app.route('/api/mcp/streamable-http', methods=['GET', 'POST'])
+@csrf.exempt
+def mcp_streamable_http():
+    """Streamable HTTP endpoint: single URL for MCP clients (e.g. Claude web).
+
+    Per the MCP streamable HTTP spec:
+    - POST: receives a JSON-RPC 2.0 request and returns its response inline
+      (stateless — no session needed, unlike the SSE transport).
+    - GET: opens an SSE-style event stream for server → client events
+      (kept for compatibility; plain request/response clients only use POST).
+    """
+    auth_result = _mcp_authenticate()
+    if not auth_result:
+        return jsonify({"error": "Unauthorized. Provide a valid Bearer token."}), 401
+
+    user_id = auth_result["user_id"]
+    user_name = auth_result.get("user_name", "Unknown")
+    scope = auth_result.get("scope", "read_write")
+
+    if request.method == 'GET':
+        # Initiate streamable HTTP connection
+        session_id = str(uuid.uuid4())
+        session = sessions.create(session_id, user_id, user_name, scope)
+        endpoint_url = url_for('mcp_streamable_http', _external=True) + f"?session_id={session_id}"
+
+        def event_stream():
+            try:
+                yield f"event: endpoint\ndata: {endpoint_url}\n\n"
+                while True:
+                    responses = session.drain_responses()
+                    for resp in responses:
+                        yield f"data: {json.dumps(resp)}\n\n"
+                    time.sleep(0.5)
+            except GeneratorExit:
+                pass
+            finally:
+                sessions.remove(session_id)
+
+        response = Response(event_stream(), mimetype='text/event-stream')
+        response.headers['Cache-Control'] = 'no-cache'
+        response.headers['Connection'] = 'keep-alive'
+        response.headers['X-Accel-Buffering'] = 'no'
+        return response
+
+    # POST: stateless JSON-RPC — dispatch and return the response inline so
+    # the client gets its result on the same request (no session round-trip).
+    try:
+        message = request.get_json(force=True)
+    except Exception:
+        return jsonify(mcp_server.dispatch(
+            {"jsonrpc": "2.0", "method": "unknown", "id": None},
+            user_id, user_name, scope
+        ))
+    responses = mcp_server.dispatch(message, user_id, user_name, scope)
+    if len(responses) == 1:
+        return jsonify(responses[0])
+    return jsonify(responses)
 
 
 @app.route('/api/mcp/messages', methods=['POST'])
@@ -1432,6 +1502,8 @@ def mcp_help_page():
     ]
     by_name = {t["name"]: t for t in tools}
     grouped_tools = [(title, [by_name[n] for n in names if n in by_name]) for title, names in groups]
+    sse_url = url_for('mcp_sse', _external=True)
+    streamable_http_url = url_for('mcp_streamable_http', _external=True)
     return render_template(
         'mcp_help.html',
         name=current_user.name,
@@ -1442,7 +1514,8 @@ def mcp_help_page():
         protocol_version=PROTOCOL_VERSION,
         supported_versions=SUPPORTED_PROTOCOL_VERSIONS,
         server_info={"name": "mtracker", "version": "1.1.0"},
-        sse_url=url_for('mcp_sse', _external=True),
+        sse_url=sse_url,
+        streamable_http_url=streamable_http_url,
         messages_url=url_for('mcp_messages', _external=True),
     )
 
