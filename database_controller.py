@@ -23,6 +23,27 @@ class DatabaseController:
         :param config: Dictionary containing 'host', 'user', 'password', and 'database'
         """
         self.config = config
+        self._migrate_schema()
+
+    def _migrate_schema(self):
+        """Applies lightweight, idempotent migrations to keep production DB in sync."""
+        conn = self.get_connection()
+        if not conn:
+            return
+        try:
+            cursor = conn.cursor()
+            # pin_hash for dashboard privacy PIN
+            cursor.execute(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                "WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'pin_hash'"
+            )
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE users ADD COLUMN pin_hash VARCHAR(255) NULL")
+                conn.commit()
+        except Error as e:
+            print(f"Error during schema migration: {e}")
+        finally:
+            conn.close()
 
     def get_connection(self):
         """Creates and returns a new database connection."""
@@ -125,7 +146,7 @@ class DatabaseController:
         finally:
             conn.close()
 
-    def update_user(self, user_id, name=None, email=None, phone=None, profile_pic_path=None, currency_pref=None, default_account_id=None, password_hash=None):
+    def update_user(self, user_id, name=None, email=None, phone=None, profile_pic_path=None, currency_pref=None, default_account_id=None, password_hash=None, pin_hash=None):
         """
         Updates user profile information.
         """
@@ -156,6 +177,9 @@ class DatabaseController:
             if password_hash:
                 updates.append("password_hash = %s")
                 params.append(password_hash)
+            if pin_hash is not None:
+                updates.append("pin_hash = %s")
+                params.append(pin_hash)
 
             if not updates:
                 return True

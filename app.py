@@ -318,7 +318,7 @@ def get_backup_email_html(filename, file_size_str, user_name="Admin"):
 # --- User Management ---
 
 class User(UserMixin):
-    def __init__(self, id, name, password_hash, email=None, phone=None, registration_method='email', profile_pic_path=None, currency_pref='INR', default_account_id=None, is_admin=False):
+    def __init__(self, id, name, password_hash, email=None, phone=None, registration_method='email', profile_pic_path=None, currency_pref='INR', default_account_id=None, is_admin=False, pin_hash=None):
         self.id = id
         self.name = name
         self.password_hash = password_hash
@@ -329,6 +329,7 @@ class User(UserMixin):
         self.currency_pref = currency_pref
         self.default_account_id = default_account_id
         self.is_admin = is_admin
+        self.pin_hash = pin_hash
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -344,7 +345,8 @@ def load_user(user_id):
             u.get('profile_pic_path'),
             u.get('currency_pref', 'INR'),
             u.get('default_account_id'),
-            u.get('is_admin', False)
+            u.get('is_admin', False),
+            u.get('pin_hash')
         )
     return None
 
@@ -474,7 +476,8 @@ def login():
                 user_data.get('profile_pic_path'),
                 user_data.get('currency_pref', 'INR'),
                 user_data.get('default_account_id'),
-                user_data.get('is_admin', False)
+                user_data.get('is_admin', False),
+                user_data.get('pin_hash')
             )
             login_user(user)
             return redirect(url_for('index'))
@@ -941,6 +944,57 @@ def update_password():
         return jsonify({"status": "success", "message": "Password updated successfully!"})
 
     return jsonify({"status": "error", "message": "Failed to update password."}), 500
+
+# --- Dashboard Privacy PIN ---
+
+def _validate_pin(pin):
+    """Validates that a PIN is 4-8 numeric digits."""
+    if not pin or not pin.isdigit() or not (4 <= len(pin) <= 8):
+        return False
+    return True
+
+@app.route('/api/pin/status', methods=['GET'])
+@login_required
+def pin_status():
+    return jsonify({"status": "success", "has_pin": bool(current_user.pin_hash)})
+
+@app.route('/api/pin/set', methods=['POST'])
+@login_required
+def pin_set():
+    data = request.get_json(silent=True) or {}
+    pin = str(data.get('pin', ''))
+    if not _validate_pin(pin):
+        return jsonify({"status": "error", "message": "PIN must be 4-8 numeric digits."}), 400
+    pin_hash = generate_password_hash(pin)
+    if db.update_user(current_user.id, pin_hash=pin_hash):
+        return jsonify({"status": "success", "message": "PIN set successfully!"})
+    return jsonify({"status": "error", "message": "Failed to set PIN."}), 500
+
+@app.route('/api/pin/verify', methods=['POST'])
+@login_required
+def pin_verify():
+    data = request.get_json(silent=True) or {}
+    pin = str(data.get('pin', ''))
+    if not current_user.pin_hash:
+        return jsonify({"status": "error", "message": "No PIN is set."}), 404
+    if check_password_hash(current_user.pin_hash, pin):
+        return jsonify({"status": "success", "message": "PIN verified."})
+    return jsonify({"status": "error", "message": "Incorrect PIN. Please try again."}), 403
+
+@app.route('/api/pin/update', methods=['POST'])
+@login_required
+def pin_update():
+    if not session.get('pwd_verified_via_otp'):
+        return jsonify({"status": "error", "message": "Identity verification missing."}), 403
+    data = request.get_json(silent=True) or {}
+    pin = str(data.get('pin', ''))
+    if not _validate_pin(pin):
+        return jsonify({"status": "error", "message": "PIN must be 4-8 numeric digits."}), 400
+    session.pop('pwd_verified_via_otp', None)
+    pin_hash = generate_password_hash(pin)
+    if db.update_user(current_user.id, pin_hash=pin_hash):
+        return jsonify({"status": "success", "message": "PIN updated successfully!"})
+    return jsonify({"status": "error", "message": "Failed to update PIN."}), 500
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
