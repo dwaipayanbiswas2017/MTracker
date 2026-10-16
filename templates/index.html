@@ -1398,6 +1398,7 @@
         }
 
         let pinUpdateMode = false;
+        let expectedPinLength = null;
 
         function refreshBalanceToggle() {
             ['', '-mobile'].forEach(sfx => {
@@ -1437,8 +1438,10 @@
             $('#pinSetError').addClass('hidden');
             $('#pinInput').val('');
             pinUpdateMode = false;
+            expectedPinLength = null;
             $.get('/api/pin/status', function(res) {
                 if (res.has_pin) {
+                    expectedPinLength = res.pin_length || null;
                     $('#pinModalTitle').text('Enter PIN');
                     $('#pinUnlockSection').removeClass('hidden');
                     $('#pinSetSection').addClass('hidden');
@@ -1463,6 +1466,16 @@
             $('#pinModal').addClass('hidden');
         }
 
+        function onPinInput() {
+            $('#pinError').addClass('hidden');
+            const pin = $('#pinInput').val();
+            if (!/^\d+$/.test(pin)) return;
+            const target = expectedPinLength || 8;
+            if (pin.length >= target) {
+                verifyPin();
+            }
+        }
+
         function verifyPin() {
             const pin = $('#pinInput').val();
             if (!pin || !/^\d{4,8}$/.test(pin)) {
@@ -1484,6 +1497,7 @@
                 error: function(xhr) {
                     const msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Verification failed.';
                     $('#pinError').text(msg).removeClass('hidden');
+                    $('#pinInput').val('').focus();
                 }
             });
         }
@@ -1612,6 +1626,11 @@
                 } else {
                     $(this).removeClass('has-value');
                 }
+            });
+
+            // PIN input: auto-verify once the full PIN has been entered
+            $('#pinInput').on('input', onPinInput).on('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); verifyPin(); }
             });
 
             loadLongPending();

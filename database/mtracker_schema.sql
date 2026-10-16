@@ -26,6 +26,7 @@ CREATE TABLE users (
     currency_pref VARCHAR(10) DEFAULT 'INR' COMMENT 'User preferred currency',
     default_account_id INT COMMENT 'Preferred default account ID',
     pin_hash VARCHAR(255) COMMENT 'Hashed dashboard privacy PIN',
+    pin_length INT COMMENT 'Number of digits in the privacy PIN (for auto-submit)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,

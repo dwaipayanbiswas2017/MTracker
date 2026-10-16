@@ -40,6 +40,14 @@ class DatabaseController:
             if cursor.fetchone()[0] == 0:
                 cursor.execute("ALTER TABLE users ADD COLUMN pin_hash VARCHAR(255) NULL")
                 conn.commit()
+            # pin_length for auto-submitting the privacy PIN (4-8 digits)
+            cursor.execute(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                "WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'pin_length'"
+            )
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE users ADD COLUMN pin_length INT NULL")
+                conn.commit()
         except Error as e:
             print(f"Error during schema migration: {e}")
         finally:
@@ -146,7 +154,7 @@ class DatabaseController:
         finally:
             conn.close()
 
-    def update_user(self, user_id, name=None, email=None, phone=None, profile_pic_path=None, currency_pref=None, default_account_id=None, password_hash=None, pin_hash=None):
+    def update_user(self, user_id, name=None, email=None, phone=None, profile_pic_path=None, currency_pref=None, default_account_id=None, password_hash=None, pin_hash=None, pin_length=None):
         """
         Updates user profile information.
         """
@@ -180,6 +188,9 @@ class DatabaseController:
             if pin_hash is not None:
                 updates.append("pin_hash = %s")
                 params.append(pin_hash)
+            if pin_length is not None:
+                updates.append("pin_length = %s")
+                params.append(pin_length)
 
             if not updates:
                 return True

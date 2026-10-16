@@ -318,7 +318,7 @@ def get_backup_email_html(filename, file_size_str, user_name="Admin"):
 # --- User Management ---
 
 class User(UserMixin):
-    def __init__(self, id, name, password_hash, email=None, phone=None, registration_method='email', profile_pic_path=None, currency_pref='INR', default_account_id=None, is_admin=False, pin_hash=None):
+    def __init__(self, id, name, password_hash, email=None, phone=None, registration_method='email', profile_pic_path=None, currency_pref='INR', default_account_id=None, is_admin=False, pin_hash=None, pin_length=None):
         self.id = id
         self.name = name
         self.password_hash = password_hash
@@ -330,6 +330,7 @@ class User(UserMixin):
         self.default_account_id = default_account_id
         self.is_admin = is_admin
         self.pin_hash = pin_hash
+        self.pin_length = pin_length
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -346,7 +347,8 @@ def load_user(user_id):
             u.get('currency_pref', 'INR'),
             u.get('default_account_id'),
             u.get('is_admin', False),
-            u.get('pin_hash')
+            u.get('pin_hash'),
+            u.get('pin_length')
         )
     return None
 
@@ -477,7 +479,8 @@ def login():
                 user_data.get('currency_pref', 'INR'),
                 user_data.get('default_account_id'),
                 user_data.get('is_admin', False),
-                user_data.get('pin_hash')
+                user_data.get('pin_hash'),
+                user_data.get('pin_length')
             )
             login_user(user)
             return redirect(url_for('index'))
@@ -956,7 +959,11 @@ def _validate_pin(pin):
 @app.route('/api/pin/status', methods=['GET'])
 @login_required
 def pin_status():
-    return jsonify({"status": "success", "has_pin": bool(current_user.pin_hash)})
+    return jsonify({
+        "status": "success",
+        "has_pin": bool(current_user.pin_hash),
+        "pin_length": current_user.pin_length
+    })
 
 @app.route('/api/pin/set', methods=['POST'])
 @login_required
@@ -966,7 +973,7 @@ def pin_set():
     if not _validate_pin(pin):
         return jsonify({"status": "error", "message": "PIN must be 4-8 numeric digits."}), 400
     pin_hash = generate_password_hash(pin)
-    if db.update_user(current_user.id, pin_hash=pin_hash):
+    if db.update_user(current_user.id, pin_hash=pin_hash, pin_length=len(pin)):
         return jsonify({"status": "success", "message": "PIN set successfully!"})
     return jsonify({"status": "error", "message": "Failed to set PIN."}), 500
 
@@ -992,7 +999,7 @@ def pin_update():
         return jsonify({"status": "error", "message": "PIN must be 4-8 numeric digits."}), 400
     session.pop('pwd_verified_via_otp', None)
     pin_hash = generate_password_hash(pin)
-    if db.update_user(current_user.id, pin_hash=pin_hash):
+    if db.update_user(current_user.id, pin_hash=pin_hash, pin_length=len(pin)):
         return jsonify({"status": "success", "message": "PIN updated successfully!"})
     return jsonify({"status": "error", "message": "Failed to update PIN."}), 500
 
