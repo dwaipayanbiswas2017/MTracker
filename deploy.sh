@@ -87,6 +87,7 @@ check() { # check <desc> <expected-code> <url> [curl-args...]
 }
 
 check "login page"            200 "$BASE_URL/login"
+check "public help page"      200 "$BASE_URL/help"
 check "MCP SSE requires auth (new code live)" 401 "$BASE_URL/api/mcp/sse"
 check "API keys page requires login (route registered)" 302 "$BASE_URL/api-keys"
 check "MCP help page requires login (route registered)" 302 "$BASE_URL/mcp-help"

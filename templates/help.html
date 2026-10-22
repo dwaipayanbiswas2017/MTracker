@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help &amp; Documentation - MTracker</title>
+    <meta name="description" content="Learn how to use MTracker to track income, expenses, budgets, debts, accounts and more. Public help centre — no sign-in required.">
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        brand: '#2563eb',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 6rem;
+        }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        }
+        .doc-card {
+            border-radius: 1rem;
+        }
+        .toc-link.active {
+            color: #2563eb;
+            background-color: rgba(37, 99, 235, 0.08);
+            font-weight: 600;
+        }
+        .dark .toc-link.active {
+            color: #60a5fa;
+            background-color: rgba(96, 165, 250, 0.12);
+        }
+        @media (max-width: 400px) {
+            .hero-title { font-size: 1.75rem; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 antialiased">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/85 dark:bg-slate-900/85 backdrop-blur">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+            <a href="{% if current_user.is_authenticated %}{{ url_for('index') }}{% else %}{{ url_for('login') }}{% endif %}" class="flex items-center gap-2 shrink-0">
+                <i data-lucide="wallet" class="w-7 h-7 text-blue-500"></i>
+                <span class="text-xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></span>
+            </a>
+
+            <nav class="hidden md:flex items-center gap-1 text-sm font-medium text-slate-600 dark:text-slate-300">
+                <a href="#getting-started" class="px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Getting started</a>
+                <a href="#features" class="px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Features</a>
+                <a href="#ai-mcp" class="px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">AI &amp; MCP</a>
+                <a href="#faq" class="px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">FAQ</a>
+            </nav>
+
+            <div class="flex items-center gap-2 shrink-0">
+                <button id="theme-toggle" class="p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Toggle theme" aria-label="Toggle theme">
+                    <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
+                </button>
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('index') }}" class="hidden sm:inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    Dashboard
+                </a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="hidden sm:inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    Sign in
+                </a>
+                <a href="{{ url_for('register') }}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+                    Create account
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+
+        <!-- Hero -->
+        <section class="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
+            <span class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 px-3 py-1.5 rounded-full mb-5">
+                <i data-lucide="life-buoy" class="w-3.5 h-3.5"></i>
+                Help centre
+            </span>
+            <h1 class="hero-title text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight mb-4">
+                Everything you need to know about <span class="text-blue-500">MTracker</span>
+            </h1>
+            <p class="text-base sm:text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
+                A practical, plain-language guide to tracking money: income, expenses, budgets, debts, accounts, the AI assistant and MCP integrations. No sign-in required.
+            </p>
+            <div class="mt-7 flex flex-wrap items-center justify-center gap-3">
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('index') }}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors shadow-sm">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Go to dashboard
+                </a>
+                {% else %}
+                <a href="{{ url_for('register') }}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors shadow-sm">
+                    <i data-lucide="user-plus" class="w-4 h-4"></i> Create free account
+                </a>
+                <a href="{{ url_for('login') }}" class="inline-flex items-center gap-2 font-semibold px-5 py-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <i data-lucide="log-in" class="w-4 h-4"></i> Sign in
+                </a>
+                {% endif %}
+                <a href="#getting-started" class="inline-flex items-center gap-2 font-semibold px-5 py-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    Read the guide <i data-lucide="arrow-down" class="w-4 h-4"></i>
+                </a>
+            </div>
+        </section>
+
+        <div class="lg:grid lg:grid-cols-[230px_1fr] lg:gap-12">
+
+            <!-- Table of contents -->
+            <aside class="hidden lg:block">
+                <div class="sticky top-24">
+                    <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">On this page</p>
+                    <nav id="toc" class="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+                        <a href="#getting-started" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Getting started</a>
+                        <a href="#dashboard" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Dashboard &amp; totals</a>
+                        <a href="#features" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Money features</a>
+                        <a href="#accounts" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Accounts &amp; categories</a>
+                        <a href="#months" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Months</a>
+                        <a href="#privacy" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Privacy &amp; PIN lock</a>
+                        <a href="#ai-mcp" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">AI assistant &amp; MCP</a>
+                        <a href="#import" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">CSV import</a>
+                        <a href="#security" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Data &amp; security</a>
+                        <a href="#faq" class="toc-link block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">FAQ</a>
+                    </nav>
+                    <div class="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800">
+                        <p class="text-xs text-slate-400 mb-3">Need more help?</p>
+                        <a href="mailto:support@mtracker.com" class="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                            <i data-lucide="mail" class="w-4 h-4"></i> Contact support
+                        </a>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Content -->
+            <div class="space-y-12 max-w-3xl">
+
+                <!-- Getting started -->
+                <section id="getting-started">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="rocket" class="w-6 h-6 text-blue-500"></i> Getting started
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400 mb-5">
+                        You can be tracking in a few minutes. Follow these steps once, then keep adding entries as money moves.
+                    </p>
+
+                    <ol class="space-y-4">
+                        <li class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 flex gap-4">
+                            <span class="shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">1</span>
+                            <div>
+                                <h3 class="font-semibold mb-1">Create your account</h3>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">Register with your name, email and a password. If email verification is enabled, enter the one-time code (OTP) sent to your inbox.</p>
+                            </div>
+                        </li>
+                        <li class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 flex gap-4">
+                            <span class="shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">2</span>
+                            <div>
+                                <h3 class="font-semibold mb-1">Create your first month</h3>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">On the dashboard, open the month selector and create the month you want to track. You can optionally copy pending items from the previous month.</p>
+                            </div>
+                        </li>
+                        <li class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 flex gap-4">
+                            <span class="shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">3</span>
+                            <div>
+                                <h3 class="font-semibold mb-1">Set opening balances</h3>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">For each account (for example Cash, SBI-2390), enter how much money it holds at the start of the month. This is your “available from previous month”.</p>
+                            </div>
+                        </li>
+                        <li class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 flex gap-4">
+                            <span class="shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">4</span>
+                            <div>
+                                <h3 class="font-semibold mb-1">Add income and spending</h3>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">Record income, paid expenses, daily spends, pending bills and long-term debts. Everything is saved automatically as you add, edit or delete entries.</p>
+                            </div>
+                        </li>
+                    </ol>
+
+                    <div class="mt-5 rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 p-4 flex gap-3">
+                        <i data-lucide="lightbulb" class="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5"></i>
+                        <p class="text-sm text-blue-900 dark:text-blue-200">
+                            <span class="font-semibold">Tip:</span> Set your default account and currency in <span class="font-medium">Profile settings</span> so new entries are pre-filled.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Dashboard -->
+                <section id="dashboard">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="layout-dashboard" class="w-6 h-6 text-blue-500"></i> Dashboard &amp; totals
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400 mb-5">
+                        The dashboard is built around one month at a time. Each number answers a different question, so here is what they mean.
+                    </p>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="wallet" class="w-4 h-4 text-teal-500"></i> Available</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Opening balances plus all income recorded for the month.</p>
+                        </div>
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="receipt" class="w-4 h-4 text-rose-500"></i> Expenses</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Paid expenses plus daily expenses — everything you have actually spent.</p>
+                        </div>
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="scale" class="w-4 h-4 text-blue-500"></i> Current balance</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Available minus what you have already spent — the money you have right now.</p>
+                        </div>
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="calendar-clock" class="w-4 h-4 text-orange-500"></i> Expected balance</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Current balance minus pending bills — what should be left after planned payments.</p>
+                        </div>
+                    </div>
+
+                    <p class="text-sm text-slate-600 dark:text-slate-400 mt-4">
+                        The per-account panel shows the running balance for each account based on its opening balance, income and expenses.
+                    </p>
+                </section>
+
+                <!-- Features -->
+                <section id="features">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="list-checks" class="w-6 h-6 text-blue-500"></i> Money features
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400 mb-5">
+                        MTracker separates money into a few clear buckets so reports stay meaningful.
+                    </p>
+
+                    <div class="space-y-4">
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="trending-up" class="w-5 h-5 text-teal-500"></i> Income</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Salary, refunds, freelance payments or any money coming in. Each entry has an amount, source, account and date, and increases that account's balance.</p>
+                        </div>
+
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="credit-card" class="w-5 h-5 text-rose-500"></i> Paid expenses</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Payments you have already made — rent, bills, groceries and so on. They reduce the balance of the account you paid from.</p>
+                        </div>
+
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="coffee" class="w-5 h-5 text-blue-500"></i> Daily expenses</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Small, frequent personal spends. They are tracked separately for quick review but are still included in your total expenses and balances.</p>
+                        </div>
+
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-orange-500"></i> Pending / budget</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Bills you expect but have not paid yet. They do not reduce your current balance, but they are subtracted when calculating the expected balance. When a month is created you can copy the previous month's pending items.</p>
+                        </div>
+
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="hand-coins" class="w-5 h-5 text-purple-500"></i> Long pending / debts</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Money you owe or that is owed to you over a longer period. Record partial payments as you pay them down; each payment creates a linked expense so your records stay in sync.</p>
+                        </div>
+
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="arrow-left-right" class="w-5 h-5 text-amber-500"></i> Transfers between accounts</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Moving money from one account to another creates a linked expense and income pair, so both account balances stay accurate without changing your overall net position.</p>
+                        </div>
+
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1 flex items-center gap-2"><i data-lucide="notebook-pen" class="w-5 h-5 text-cyan-500"></i> Notes</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Jot down reminders or context for the month — for example a bill due date or a savings goal.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Accounts & categories -->
+                <section id="accounts">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="landmark" class="w-6 h-6 text-blue-500"></i> Accounts &amp; categories
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400 mb-5">
+                        Accounts represent where money lives; categories describe what money was for.
+                    </p>
+                    <div class="space-y-3 text-sm text-slate-600 dark:text-slate-400">
+                        <p><span class="font-semibold text-slate-800 dark:text-slate-200">Accounts</span> — add banks, wallets or cash. Set an opening balance per account for each month and mark one as your default. Renaming an account updates it everywhere.</p>
+                        <p><span class="font-semibold text-slate-800 dark:text-slate-200">Categories</span> — group spending (for example Food, Transport, Bills). They make the expense list easier to scan and keep reports consistent.</p>
+                    </div>
+                </section>
+
+                <!-- Months -->
+                <section id="months">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="calendar-days" class="w-6 h-6 text-blue-500"></i> Months
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400">
+                        Each month is a self-contained snapshot. Create a new month when the calendar turns, optionally copying pending items so recurring bills are not forgotten. Deleting a month removes its transactions and cannot be undone, so export or back up first if you need a copy.
+                    </p>
+                </section>
+
+                <!-- Privacy & PIN -->
+                <section id="privacy">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="lock" class="w-6 h-6 text-blue-500"></i> Privacy &amp; PIN lock
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400 mb-3">
+                        Money is personal. MTracker includes an optional PIN that hides sensitive amounts when you are in a shared space.
+                    </p>
+                    <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-400 list-disc pl-5">
+                        <li>Set a PIN from the dashboard; amounts stay hidden until you unlock them.</li>
+                        <li>Entering the correct PIN unlocks the figures immediately — no extra button press.</li>
+                        <li>Wrong PINs clear the field and show an error so you can retry safely.</li>
+                        <li>Your PIN can be changed from the dashboard at any time.</li>
+                    </ul>
+                </section>
+
+                <!-- AI & MCP -->
+                <section id="ai-mcp">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="bot" class="w-6 h-6 text-blue-500"></i> AI assistant &amp; MCP
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400 mb-4">
+                        MTracker ships two ways to work with your data using natural language.
+                    </p>
+
+                    <div class="space-y-4">
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1">Built-in AI assistant</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">Open <span class="font-medium">Chat</span> from the dashboard. Ask questions like “how much did I spend on food this month?” or “add a 500 expense for petrol”, and the assistant uses the same tools as the web UI. It always acts with your permissions.</p>
+                        </div>
+
+                        <div class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5">
+                            <h3 class="font-semibold mb-1">MCP server</h3>
+                            <p class="text-sm text-slate-600 dark:text-slate-400">
+                                Connect Claude, Gemini or any MCP-compatible client to your account.
+                                {% if current_user.is_authenticated %}
+                                Create a personal access token on the <a href="{{ url_for('api_keys_page') }}" class="text-blue-600 dark:text-blue-400 font-medium hover:underline">API Keys</a> page, then follow the <a href="{{ url_for('mcp_help_page') }}" class="text-blue-600 dark:text-blue-400 font-medium hover:underline">MCP Help</a> guide for setup and the full tool reference.
+                                {% else %}
+                                Sign in to create a personal access token and read the MCP setup guide with the full tool reference.
+                                {% endif %}
+                            </p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-3">Read-only tokens are available — perfect for giving an assistant visibility without permission to change anything.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CSV import -->
+                <section id="import">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="file-spreadsheet" class="w-6 h-6 text-blue-500"></i> CSV import
+                    </h2>
+                    <p class="text-slate-600 dark:text-slate-400">
+                        Already tracking in a spreadsheet? Import a CSV with sections for paid expenses, pending items, personal expenses, monthly income and opening balances. The importer maps each section into the matching bucket, so review the column names before uploading. The AI assistant and MCP clients can also import pasted CSV text.
+                    </p>
+                </section>
+
+                <!-- Data & security -->
+                <section id="security">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="shield-check" class="w-6 h-6 text-blue-500"></i> Data &amp; security
+                    </h2>
+                    <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-400 list-disc pl-5">
+                        <li>Your data is private to your account; sessions are protected with HTTP-only cookies.</li>
+                        <li>Administrators can schedule automatic backups. Ask your instance owner if you need a copy of your data.</li>
+                        <li>Use a strong, unique password and keep your PIN and API tokens private. Revoke tokens you no longer use from the API Keys page.</li>
+                        <li>Always sign out on shared devices.</li>
+                    </ul>
+                </section>
+
+                <!-- FAQ -->
+                <section id="faq">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">
+                        <i data-lucide="circle-help" class="w-6 h-6 text-blue-500"></i> Frequently asked questions
+                    </h2>
+
+                    <div class="mt-4 space-y-2">
+                        <details class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 group">
+                            <summary class="font-semibold cursor-pointer list-none flex items-center justify-between gap-3">
+                                Do I need an account to read this page?
+                                <i data-lucide="chevron-down" class="w-4 h-4 shrink-0 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-3">No. This help centre is public. You only need an account to store and manage your own financial data.</p>
+                        </details>
+
+                        <details class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 group">
+                            <summary class="font-semibold cursor-pointer list-none flex items-center justify-between gap-3">
+                                What is the difference between pending and long pending?
+                                <i data-lucide="chevron-down" class="w-4 h-4 shrink-0 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-3">Pending items are short-term bills expected in this month. Long pending covers debts or obligations that span months, with support for partial payments.</p>
+                        </details>
+
+                        <details class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 group">
+                            <summary class="font-semibold cursor-pointer list-none flex items-center justify-between gap-3">
+                                Will daily expenses be counted in my totals?
+                                <i data-lucide="chevron-down" class="w-4 h-4 shrink-0 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-3">Yes. They are shown separately for convenience but are included in total expenses and account balances.</p>
+                        </details>
+
+                        <details class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 group">
+                            <summary class="font-semibold cursor-pointer list-none flex items-center justify-between gap-3">
+                                Is my data saved automatically?
+                                <i data-lucide="chevron-down" class="w-4 h-4 shrink-0 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-3">Yes — adding, editing or deleting an entry saves the month to the database automatically.</p>
+                        </details>
+
+                        <details class="doc-card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 group">
+                            <summary class="font-semibold cursor-pointer list-none flex items-center justify-between gap-3">
+                                Can I use MTracker from my phone?
+                                <i data-lucide="chevron-down" class="w-4 h-4 shrink-0 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mt-3">Yes. The dashboard and this help page are responsive, with touch-friendly controls and a light/dark theme.</p>
+                        </details>
+                    </div>
+                </section>
+
+                <!-- Contact -->
+                <section class="doc-card bg-gradient-to-br from-blue-600 to-indigo-600 text-white p-6 sm:p-8">
+                    <h2 class="text-xl sm:text-2xl font-bold mb-2">Still need a hand?</h2>
+                    <p class="text-blue-100 text-sm sm:text-base mb-5">We are happy to help with setup, imports or anything that looks off.</p>
+                    <div class="flex flex-wrap gap-3">
+                        <a href="mailto:support@mtracker.com" class="inline-flex items-center gap-2 bg-white text-blue-700 font-semibold px-4 py-2.5 rounded-lg hover:bg-blue-50 transition-colors">
+                            <i data-lucide="mail" class="w-4 h-4"></i> Email support
+                        </a>
+                        <a href="https://github.com/dwaipayanbiswas2017/MTracker" target="_blank" rel="noopener" class="inline-flex items-center gap-2 border border-white/40 font-semibold px-4 py-2.5 rounded-lg hover:bg-white/10 transition-colors">
+                            <i data-lucide="github" class="w-4 h-4"></i> GitHub
+                        </a>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-200 dark:border-slate-800 mt-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="wallet" class="w-5 h-5 text-blue-500"></i>
+                    <span class="font-bold text-slate-800 dark:text-slate-200">MTracker</span>
+                </div>
+                <nav class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+                    <a href="#getting-started" class="hover:text-blue-500 transition-colors">Getting started</a>
+                    <a href="#features" class="hover:text-blue-500 transition-colors">Features</a>
+                    <a href="{% if current_user.is_authenticated %}{{ url_for('mcp_help_page') }}{% else %}{{ url_for('login') }}{% endif %}" class="hover:text-blue-500 transition-colors">MCP Help</a>
+                    <a href="mailto:support@mtracker.com" class="hover:text-blue-500 transition-colors">Support</a>
+                </nav>
+                <p class="text-xs opacity-70">&copy; 2026 MTracker Systems.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        // Theme toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        function syncThemeIcon() {
+            themeIcon.setAttribute('data-lucide', document.documentElement.classList.contains('dark') ? 'moon' : 'sun');
+            lucide.createIcons();
+        }
+        syncThemeIcon();
+        themeToggle.addEventListener('click', () => {
+            const dark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', dark ? 'dark' : 'light');
+            syncThemeIcon();
+        });
+
+        // Highlight the section currently in view
+        const links = Array.from(document.querySelectorAll('#toc .toc-link'));
+        const sections = links
+            .map(link => document.querySelector(link.getAttribute('href')))
+            .filter(Boolean);
+
+        if ('IntersectionObserver' in window && sections.length) {
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + entry.target.id));
+                });
+            }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+            sections.forEach(section => observer.observe(section));
+        }
+    </script>
+</body>
+</html>

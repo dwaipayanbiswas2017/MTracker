@@ -371,6 +371,10 @@
                             <i data-lucide="book-open" class="w-4 h-4 text-emerald-500"></i>
                             MCP Help
                         </a>
+                        <a href="{{ url_for('help_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="life-buoy" class="w-4 h-4 text-sky-500"></i>
+                            Help &amp; Docs
+                        </a>
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="shield-check" class="w-4 h-4 text-orange-500"></i>
@@ -423,6 +427,10 @@
                         <a href="{{ url_for('mcp_help_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                             <i data-lucide="book-open" class="w-4 h-4 text-emerald-500"></i>
                             MCP Help
+                        </a>
+                        <a href="{{ url_for('help_page') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                            <i data-lucide="life-buoy" class="w-4 h-4 text-sky-500"></i>
+                            Help &amp; Docs
                         </a>
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -1362,6 +1370,7 @@
                 <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-4 uppercase text-xs tracking-widest">Resources</h4>
                 <ul class="space-y-3">
                     <li><button onclick="exportPDF()" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i> Export Data</button></li>
+                    <li><a href="{{ url_for('help_page') }}" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> Help &amp; Docs</a></li>
                     <li><a href="#" class="hover:text-blue-500 transition-colors flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Privacy Policy</a></li>
                 </ul>
             </div>

@@ -1534,6 +1534,16 @@ def mcp_messages():
         return jsonify(responses)
 
 
+@app.route('/help')
+def help_page():
+    """Public help/documentation page (available to guests and signed-in users)."""
+    return render_template(
+        'help.html',
+        name=current_user.name if current_user.is_authenticated else None,
+        user=current_user,
+    )
+
+
 @app.route('/api-keys')
 @login_required
 def api_keys_page():
