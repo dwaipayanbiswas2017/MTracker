@@ -24,6 +24,14 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(24).hex()
 # CSRF protection for all state-changing endpoints
 csrf = CSRFProtect(app)
 
+@app.before_request
+def _make_session_permanent():
+    # Refresh the session cookie with an expiry so existing sessions also
+    # survive browser restarts, not just sessions created after this change.
+    if request.endpoint != 'static':
+        session.permanent = True
+
+
 @app.errorhandler(CSRFError)
 def csrf_error_handler(error):
     if request.path.startswith('/api/'):
@@ -32,6 +40,11 @@ def csrf_error_handler(error):
     return redirect(url_for('index'))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Keep sessions alive across browser restarts (30 days of inactivity)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'profile_pics')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB limit
 
@@ -482,7 +495,8 @@ def login():
                 user_data.get('pin_hash'),
                 user_data.get('pin_length')
             )
-            login_user(user)
+            login_user(user, remember=True)
+            session.permanent = True
             return redirect(url_for('index'))
         flash('Invalid Email/Phone or password')
     return render_template('login.html')
@@ -507,7 +521,8 @@ def register():
 
         if db.create_user(user_id, name, password_hash, email, phone, reg_method):
             user = User(user_id, name, password_hash, email, phone, reg_method, is_admin=False)
-            login_user(user)
+            login_user(user, remember=True)
+            session.permanent = True
             return redirect(url_for('index'))
         else:
             flash('Error creating account. Please try again.')
