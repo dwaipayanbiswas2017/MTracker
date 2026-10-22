@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Expense Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#2563eb">
+    <title>Sign In - MTracker</title>
 
     <script>
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -12,6 +13,10 @@
             document.documentElement.classList.remove('dark');
         }
     </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -23,6 +28,9 @@
                         darkbg: '#0f172a',
                         cardbg: '#1e293b',
                         brand: '#2563eb',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
                     }
                 }
             }
@@ -37,102 +45,368 @@
             --input-border: #cbd5e1;
             --input-text: #0f172a;
             --border-color: #e2e8f0;
+            --muted-color: #64748b;
+            --panel-bg: #ffffff;
         }
 
         .dark {
             --bg-color: #0f172a;
             --text-color: #f1f5f9;
             --card-bg: #1e293b;
-            --input-bg: #1e293b;
+            --input-bg: #0f172a;
             --input-border: #334155;
             --input-text: #f1f5f9;
             --border-color: #334155;
+            --muted-color: #94a3b8;
+            --panel-bg: #1e293b;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
             font-family: 'Inter', system-ui, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
+        /* Modern card */
         .card {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border-radius: 1.25rem;
+            box-shadow: 0 10px 30px -12px rgb(15 23 42 / 0.18), 0 4px 6px -4px rgb(0 0 0 / 0.08);
         }
 
+        /* Touch-friendly inputs (16px avoids iOS auto-zoom) */
         .input-field {
             background-color: var(--input-bg);
             border: 1px solid var(--input-border);
             color: var(--input-text);
-            padding: 0.625rem;
-            border-radius: 0.5rem;
+            font-size: 1rem;
+            line-height: 1.4;
+            padding: 0.8rem 0.9rem;
+            border-radius: 0.75rem;
             width: 100%;
             outline: none;
-            transition: all 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+        }
+
+        .input-field::placeholder {
+            color: var(--muted-color);
+            opacity: 0.75;
         }
 
         .input-field:focus {
             border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
         }
+
+        /* Feature tiles: cards in a carousel on mobile, list-grid on desktop */
+        .feature-item {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+            padding: 0.9rem;
+            border-radius: 1rem;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+            transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
+        }
+
+        .feature-icon {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.4rem;
+            height: 2.4rem;
+            border-radius: 0.7rem;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(124, 58, 237, 0.08));
+            color: #2563eb;
+        }
+
+        .dark .feature-icon {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.32), rgba(124, 58, 237, 0.18));
+            color: #60a5fa;
+        }
+
+        @media (min-width: 1024px) {
+            .feature-item {
+                padding: 0.7rem;
+                background-color: transparent;
+                border-color: transparent;
+                box-shadow: none;
+            }
+            .feature-item:hover {
+                background-color: rgba(37, 99, 235, 0.06);
+                transform: translateY(-1px);
+            }
+        }
+
+        .glow {
+            position: fixed;
+            border-radius: 9999px;
+            filter: blur(70px);
+            opacity: 0.4;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @media (min-width: 768px) {
+            .glow { filter: blur(90px); opacity: 0.45; }
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+            padding: 0.4rem 0.75rem;
+            border-radius: 9999px;
+            border: 1px solid var(--border-color);
+            color: var(--muted-color);
+            background-color: var(--card-bg);
+        }
+
+        .brand-gradient {
+            background: linear-gradient(120deg, #2563eb 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
+            box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.6);
+        }
+
+        /* Hide scrollbars on carousels */
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* iOS safe area */
+        .safe-bottom { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
     </style>
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="flex flex-col min-h-screen items-center justify-center p-4">
-    <div class="w-full max-w-md p-6 md:p-8 space-y-6 card my-auto">
-        <div class="flex items-center gap-2 justify-center mb-6">
-            <i data-lucide="wallet" class="w-8 h-8 text-blue-500"></i>
-            <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">M<span class="text-blue-500">Tracker</span></h1>
-        </div>
-        <h1 class="text-xl font-bold text-center text-slate-800 dark:text-white">Sign In</h1>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 p-3 rounded-lg text-sm text-center">
-                    {{ messages[0] }}
-                </div>
-            {% endif %}
-        {% endwith %}
-        <form action="/login" method="POST" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
-                <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Email or Phone</label>
-                <input type="text" name="username" required class="input-field" placeholder="Enter Email or Phone number">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Password</label>
-                <div class="relative">
-                    <input type="password" name="password" required class="input-field pr-10" placeholder="Enter password" id="loginPassword">
-                    <button type="button" onclick="togglePassword('loginPassword', this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                        <i data-lucide="eye" class="w-5 h-5"></i>
-                    </button>
-                </div>
-                <div class="flex justify-end mt-1">
-                    <a href="/forgot_password" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Forgot password?</a>
-                </div>
-            </div>
-            <button type="submit" class="w-full py-3 font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:translate-y-0.5 transition-all">
-                Login
-            </button>
-        </form>
-        <p class="text-sm text-center text-slate-500 dark:text-slate-400">
-            Don't have an account? <a href="/register" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline">Create account</a>
-        </p>
-    </div>
+<body class="min-h-[100dvh] relative overflow-x-hidden antialiased">
+    <!-- Ambient background glows -->
+    <div class="glow w-56 h-56 bg-blue-500/40 -top-20 -left-16 sm:w-72 sm:h-72"></div>
+    <div class="glow w-64 h-64 bg-violet-500/30 top-1/3 -right-24 sm:w-80 sm:h-80"></div>
+    <div class="glow w-48 h-48 bg-sky-400/20 bottom-0 left-1/3 sm:w-64 sm:h-64"></div>
 
-    <!-- Footer -->
-    <footer class="mt-auto py-8 text-slate-500 dark:text-slate-400 text-sm text-center w-full border-t border-slate-200 dark:border-slate-800 opacity-80">
-        <div class="max-w-md mx-auto space-y-4">
-            <div class="flex justify-center gap-6">
-                <a href="#" class="hover:text-blue-500 transition-colors">Privacy Policy</a>
-                <a href="#" class="hover:text-blue-500 transition-colors">Terms of Service</a>
-                <a href="mailto:support@mtracker.com" class="hover:text-blue-500 transition-colors">Support</a>
+    <!-- Theme toggle -->
+    <button id="theme-toggle" aria-label="Toggle theme"
+            class="fixed top-4 right-4 z-30 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 p-2.5 rounded-full shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors active:scale-95">
+        <i id="theme-icon" data-lucide="sun" class="w-5 h-5"></i>
+    </button>
+
+    <div class="relative z-10 min-h-[100dvh] flex flex-col">
+        <main class="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-6 lg:pt-10 lg:pb-10">
+
+            <!-- ===== Mobile hero (compact) ===== -->
+            <div class="lg:hidden text-center max-w-md mx-auto mb-7">
+                <div class="flex items-center justify-center gap-2.5 mb-4">
+                    <div class="brand-mark w-10 h-10 rounded-xl">
+                        <i data-lucide="wallet" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-2xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></span>
+                </div>
+                <span class="chip mb-3">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-500"></i>
+                    Private &middot; Multi-account &middot; AI-powered
+                </span>
+                <h2 class="text-2xl font-extrabold tracking-tight leading-tight">
+                    Your money, <span class="brand-gradient">clearly tracked.</span>
+                </h2>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    Plan budgets, track every account, and ask your finances anything.
+                </p>
             </div>
-            <p>&copy; 2026 MTracker Systems. Built for private financial tracking.</p>
-        </div>
-    </footer>
+
+            <div class="grid lg:grid-cols-2 lg:gap-12 lg:items-center">
+
+                <!-- ================= Sign-in form (first on mobile) ================= -->
+                <section class="order-1 lg:order-2 w-full max-w-md min-w-0 mx-auto">
+                    <div class="card p-6 sm:p-8 space-y-6">
+                        <div class="text-center lg:text-left">
+                            <h1 class="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">Welcome back</h1>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Sign in to continue to your dashboard.</p>
+                        </div>
+
+                        {% with messages = get_flashed_messages() %}
+                            {% if messages %}
+                                <div class="flex items-start gap-2 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm">
+                                    <i data-lucide="alert-circle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                                    <span>{{ messages[0] }}</span>
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+
+                        <form action="/login" method="POST" class="space-y-4">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1.5">Email or Phone</label>
+                                <input type="text" name="username" required class="input-field" placeholder="Enter Email or Phone number" autocomplete="username" inputmode="email">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1.5">Password</label>
+                                <div class="relative">
+                                    <input type="password" name="password" required class="input-field pr-12" placeholder="Enter password" id="loginPassword" autocomplete="current-password">
+                                    <button type="button" onclick="togglePassword('loginPassword', this)" aria-label="Show password"
+                                            class="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-2 rounded-lg active:scale-95 transition">
+                                        <i data-lucide="eye" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <div class="flex justify-end mt-1.5">
+                                    <a href="/forgot_password" class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">Forgot password?</a>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full min-h-[52px] py-3.5 font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/25 active:translate-y-0.5 transition-all">
+                                Login
+                            </button>
+                        </form>
+
+                        <p class="text-sm text-center text-slate-500 dark:text-slate-400">
+                            Don't have an account?
+                            <a href="/register" class="text-blue-600 dark:text-blue-400 font-semibold hover:underline">Create account</a>
+                        </p>
+                    </div>
+
+                    <p class="mt-4 text-center text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1.5">
+                        <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                        Private by design — your financial data stays yours.
+                    </p>
+                </section>
+
+                <!-- ================= Marketing / Project glimpse ================= -->
+                <section class="order-2 lg:order-1 mt-10 lg:mt-0 min-w-0">
+
+                    <!-- Desktop hero -->
+                    <div class="hidden lg:block">
+                        <div class="flex items-center gap-2 mb-5">
+                            <div class="brand-mark w-11 h-11 rounded-2xl">
+                                <i data-lucide="wallet" class="w-6 h-6"></i>
+                            </div>
+                            <h1 class="text-3xl font-bold tracking-tight">M<span class="text-blue-500">Tracker</span></h1>
+                        </div>
+                        <span class="chip mb-4">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-500"></i>
+                            Private &middot; Multi-account &middot; AI-powered
+                        </span>
+                        <h2 class="text-3xl font-extrabold tracking-tight leading-tight">
+                            Your money, <span class="brand-gradient">clearly tracked.</span>
+                        </h2>
+                        <p class="mt-3 text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-xl">
+                            MTracker is a private, multi-account personal finance manager. Plan monthly
+                            budgets, record income and expenses, track debts, and analyse every category —
+                            then query it all in natural language with the built-in AI assistant.
+                        </p>
+                    </div>
+
+                    <!-- Feature tiles: swipeable on mobile, grid on desktop -->
+                    <div class="mt-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">What you get</p>
+                            <span class="lg:hidden text-[11px] font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                <i data-lucide="move-horizontal" class="w-3.5 h-3.5"></i> swipe
+                            </span>
+                        </div>
+
+                        <div class="flex gap-3 w-full min-w-0 max-w-full overflow-x-auto no-scrollbar snap-x snap-mandatory -mx-4 px-4 pb-1
+                                    lg:mx-0 lg:px-0 lg:pb-0 lg:grid lg:grid-cols-2 lg:gap-1.5 lg:overflow-visible">
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="wallet" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">Multi-Account Tracking</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Cash, bank &amp; credit cards with per-account balances.</p>
+                                </div>
+                            </div>
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="calendar-days" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">Monthly Budgets</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Balances carry forward month over month.</p>
+                                </div>
+                            </div>
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="pie-chart" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">Expense Analytics</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Category breakdowns with filterable charts.</p>
+                                </div>
+                            </div>
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="arrow-left-right" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">Fund Transfers</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Move money between accounts in one step.</p>
+                                </div>
+                            </div>
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="hand-coins" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">Debts &amp; Long-Pending</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Track loans with partial payments.</p>
+                                </div>
+                            </div>
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="receipt" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">Personal Daily Budgets</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Auto-reduce budgets against daily spends.</p>
+                                </div>
+                            </div>
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="bot" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">AI Assistant &amp; MCP</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ask questions; connect Claude &amp; VSCode.</p>
+                                </div>
+                            </div>
+                            <div class="feature-item snap-start shrink-0 w-[78%] max-w-[280px] lg:w-auto lg:max-w-none">
+                                <div class="feature-icon"><i data-lucide="shield-check" class="w-5 h-5"></i></div>
+                                <div>
+                                    <p class="font-semibold text-sm">Secure &amp; Backed Up</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Hashed auth, CSRF, automated backups.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Capability chips -->
+                    <div class="mt-5 flex gap-2 w-full min-w-0 max-w-full overflow-x-auto no-scrollbar -mx-4 px-4 pb-1 lg:mx-0 lg:px-0 lg:pb-0 lg:flex-wrap">
+                        <span class="chip"><i data-lucide="file-down" class="w-3.5 h-3.5"></i> PDF Reports</span>
+                        <span class="chip"><i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> CSV Import</span>
+                        <span class="chip"><i data-lucide="database" class="w-3.5 h-3.5"></i> Auto Backups</span>
+                        <span class="chip"><i data-lucide="mail" class="w-3.5 h-3.5"></i> OTP Recovery</span>
+                        <span class="chip"><i data-lucide="moon-star" class="w-3.5 h-3.5"></i> Light &amp; Dark</span>
+                        <span class="chip"><i data-lucide="key-round" class="w-3.5 h-3.5"></i> API Keys</span>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="safe-bottom pt-5 mt-2 text-slate-500 dark:text-slate-400 text-xs sm:text-sm text-center w-full border-t border-slate-200 dark:border-slate-800">
+            <div class="max-w-2xl mx-auto space-y-2.5 px-4">
+                <div class="flex flex-wrap justify-center gap-x-5 gap-y-2">
+                    <a href="#" class="hover:text-blue-500 transition-colors">Privacy Policy</a>
+                    <a href="#" class="hover:text-blue-500 transition-colors">Terms of Service</a>
+                    <a href="mailto:support@mtracker.com" class="hover:text-blue-500 transition-colors">Support</a>
+                </div>
+                <p class="text-[11px] sm:text-xs opacity-80">&copy; 2026 MTracker Systems. Built for private financial tracking.</p>
+            </div>
+        </footer>
+    </div>
 
     <script>
         function togglePassword(inputId, btn) {
@@ -141,11 +415,35 @@
             if (input.type === 'password') {
                 input.type = 'text';
                 icon.setAttribute('data-lucide', 'eye-off');
+                btn.setAttribute('aria-label', 'Hide password');
             } else {
                 input.type = 'password';
                 icon.setAttribute('data-lucide', 'eye');
+                btn.setAttribute('aria-label', 'Show password');
             }
             lucide.createIcons();
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark');
+            if (isDark) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                document.getElementById('theme-icon').setAttribute('data-lucide', 'sun');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                document.getElementById('theme-icon').setAttribute('data-lucide', 'moon');
+            }
+            lucide.createIcons();
+        }
+
+        document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+        // Reflect the active theme in the toggle icon on load
+        if (document.documentElement.classList.contains('dark')) {
+            document.getElementById('theme-icon').setAttribute('data-lucide', 'moon');
         }
         lucide.createIcons();
     </script>
